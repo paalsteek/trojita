@@ -1490,6 +1490,8 @@ QVariant TreeItemPart::data(Model *const model, int role)
         return QString::fromUtf8("%1 bytes of data").arg(m_data.size());
     case RolePartData:
         return m_data;
+    case RolePartRawData:
+        return m_rawData;
     default:
         return QVariant();
     }
