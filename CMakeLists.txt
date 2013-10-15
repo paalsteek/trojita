@@ -389,6 +389,7 @@ set(libDesktopGui_SOURCES
     ${path_DesktopGui}/MessageView.cpp
     ${path_DesktopGui}/MsgListView.cpp
     ${path_DesktopGui}/OnePanelAtTimeWidget.cpp
+    ${path_DesktopGui}/OpenPGPView.cpp
     ${path_DesktopGui}/OverlayWidget.cpp
     ${path_DesktopGui}/PartWidget.cpp
     ${path_DesktopGui}/PartWidgetFactory.cpp

@@ -24,6 +24,7 @@
 #include "MessageView.h" // so that the compiler knows that it's a QObject
 #include "LoadablePartWidget.h"
 #include "PartWidget.h"
+#include "OpenPGPView.h"
 #include "SimplePartWidget.h"
 #include "Common/SettingsNames.h"
 #include "Imap/Model/ItemRoles.h"
@@ -150,7 +151,11 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
         if (mimeType == QLatin1String("multipart/alternative")) {
             return new MultipartAlternativeWidget(0, this, partIndex, recursionDepth, loadingMode);
         } else if (mimeType == QLatin1String("multipart/signed")) {
-            return new MultipartSignedWidget(0, this, partIndex, recursionDepth, loadingMode);
+            if (partIndex.data(RolePartProtocol).toString() == QLatin1String("application/pgp-signature")) {
+                return new OpenPGPView(0, this, partIndex, recursionDepth, loadingMode);
+            } else {
+                return new MultipartSignedWidget(0, this, partIndex, recursionDepth, loadingMode);
+            }
         } else if (mimeType == QLatin1String("multipart/related")) {
             // The purpose of this section is to find a text/html e-mail, along with its associated body parts, and hide
             // everything else than the HTML widget.

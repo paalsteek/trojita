@@ -139,6 +139,8 @@ enum {
     RolePartContentFormat,
     /** @short The delsp= parameter of the message part's Content-Type */
     RolePartContentDelSp,
+    /** @short Protocol for a multipart/signed message */
+    RolePartProtocol,
     /** @short Encoding of a message part */
     RolePartEncoding,
     /** @short The body-fld-id field from BODYSTRUCTURE */

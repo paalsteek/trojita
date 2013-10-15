@@ -1437,6 +1437,8 @@ QVariant TreeItemPart::data(Model *const model, int role)
         return m_contentFormat;
     case RolePartContentDelSp:
         return m_delSp;
+    case RolePartProtocol:
+        return m_protocol;
     case RolePartEncoding:
         return m_encoding;
     case RolePartBodyFldId:

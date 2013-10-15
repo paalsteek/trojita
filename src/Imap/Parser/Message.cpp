@@ -741,6 +741,12 @@ void AbstractMessage::storeInterestingFields(Mailbox::TreeItemPart *p) const
         }
     }
 
+    // Support for multipart/signed, RFC3156
+    it = bodyFldParam.find("PROTOCOL");
+    if (it != bodyFldParam.end()) {
+        p->setProtocol(*it);
+    }
+
     // Filename and content-disposition
     if (!bodyFldDsp.first.isNull()) {
         p->setBodyDisposition(bodyFldDsp.first);
