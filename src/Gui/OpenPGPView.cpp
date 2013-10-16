@@ -3,12 +3,12 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
+#include <QtCrypto/QtCrypto>
+
 #include <QDebug>
 
 #include "MessageView.h"
 #include "Imap/Model/ItemRoles.h"
-
-#include <gpgme.h>
 
 namespace {
 
@@ -50,17 +50,7 @@ OpenPGPView::OpenPGPView(QWidget *parent, PartWidgetFactory *factory,
         layout->addWidget(factory->create(anotherPart, recursionDepth + 1, filteredForEmbedding(options)));
         //qDebug() << "mimePart:" << mimePart.data(RolePartData);
         QModelIndex signaturePart = partIndex.child(1, 0);
-        gpgme_ctx_t gpgctx;
-        gpgme_error_t err;
-        //qDebug() << (char*) gpgme_check_version(NULL);
-        gpgme_check_version(NULL); // this has to be called before any other gpgme function
-        if ((err = gpgme_new(&gpgctx)) != GPG_ERR_NO_ERROR) {
-            //qDebug() << "Couldn't create gpg context:" << gpgme_strerror(err);
-            return;
-        }
-
-        gpgme_set_armor(gpgctx, 1);
-        gpgme_set_protocol(gpgctx, GPGME_PROTOCOL_OpenPGP);
+        Q_ASSERT(signaturePart.isValid());
 
         QByteArray rawsigned_text = mimePart.data(RolePartData).toByteArray();
         rawsigned_text += anotherPart.data(RolePartRawData).toByteArray();
@@ -68,77 +58,19 @@ OpenPGPView::OpenPGPView(QWidget *parent, PartWidgetFactory *factory,
         qDebug() << rawsigned_text.data();
         qDebug() << signaturePart.data(RolePartData).toByteArray();
 
-        gpgme_data_t sig, signed_text;
-        if ((err = gpgme_data_new_from_mem(&sig, signaturePart.data(RolePartData).toByteArray(), signaturePart.data(RolePartData).toByteArray().size(), 0)) != GPG_ERR_NO_ERROR) {
-            //qDebug() << "Couldn't load signature from mail:" << gpgme_strerror(err);
-            return;
-        }
+        QCA::Initializer init;
+        QCA::OpenPGP pgp;
+        QCA::SecureMessage msg(&pgp);
 
-        if ((err = gpgme_data_new_from_mem(&signed_text, rawsigned_text.data(), rawsigned_text.size(), 0)) != GPG_ERR_NO_ERROR) {
-            //qDebug() << "Couldn't load signed text from mail:" << gpgme_strerror(err);
-            return;
-        }
+        //msg.setRecipient(to);
+        msg.setFormat(QCA::SecureMessage::Ascii);
+        msg.startVerify(signaturePart.data(RolePartData).toByteArray());
+        msg.update(rawsigned_text.data());
+        msg.end();
+        msg.waitForFinished(2000);
 
-        gpgme_data_seek(sig, 0, SEEK_SET);
-        gpgme_data_seek(signed_text, 0, SEEK_SET);
+        QLabel *siglbl = new QLabel(tr(msg.verifySuccess()?"Success":"Failure"), this);
 
-        if ((err = gpgme_op_verify(gpgctx, sig, signed_text, NULL)) != GPG_ERR_NO_ERROR) {
-            //qDebug() << "GPG signature verification failed:" << gpgme_strerror(err);
-            return;
-        }
-
-        gpgme_verify_result_t result = gpgme_op_verify_result(gpgctx);
-        //qDebug() << result->signatures->summary;
-
-        QString sigstate;
-        switch(result->signatures->summary)
-        {
-        case GPGME_SIGSUM_VALID:
-            sigstate = "valid";
-            break;
-        case GPGME_SIGSUM_GREEN:
-            sigstate =  "green";
-            break;
-        case GPGME_SIGSUM_RED:
-            sigstate =  "red";
-            break;
-        case GPGME_SIGSUM_KEY_REVOKED:
-            sigstate =  "key revoked";
-            break;
-        case GPGME_SIGSUM_KEY_EXPIRED:
-            sigstate =  "key expired";
-            break;
-        case GPGME_SIGSUM_SIG_EXPIRED:
-            sigstate =  "signature expired";
-            break;
-        case GPGME_SIGSUM_KEY_MISSING:
-            sigstate =  "key missing";
-            break;
-        case GPGME_SIGSUM_CRL_MISSING:
-            sigstate =  "crl missing";
-            break;
-        case GPGME_SIGSUM_CRL_TOO_OLD:
-            sigstate =  "crl too old";
-            break;
-        case GPGME_SIGSUM_BAD_POLICY:
-            sigstate =  "bad policy";
-            break;
-        case GPGME_SIGSUM_SYS_ERROR:
-            sigstate =  "system error";
-            break;
-        default:
-            sigstate =  "unkown";
-        }
-
-        gpgme_key_t key;
-        gpgme_get_key(gpgctx, result->signatures->fpr, &key, 0);
-
-        QLabel *siglbl = new QLabel(tr("%1 from \"%2 <%3>\" with fingerprint %4").arg(gpgme_strerror(result->signatures->status)).arg(key->uids->name).arg(key->uids->email).arg(result->signatures->fpr), this);
-
-        gpgme_data_release(sig);
-        gpgme_data_release(signed_text);
-        gpgme_release(gpgctx);
-        Q_ASSERT(signaturePart.isValid());
         layout->addWidget(siglbl);
     }
 }

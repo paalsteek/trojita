@@ -69,6 +69,7 @@ trojita_option(WITH_ZLIB "Build with zlib library" AUTO)
 trojita_option(WITH_SHARED_PLUGINS "Enable shared dynamic plugins" ON "NOT UBUNTU_CLICK_MODE")
 trojita_option(WITH_TESTS "Build tests" ON "NOT WITH_HARMATTAN")
 trojita_option(DEV_FATAL_WARNINGS "Turn build warnings into errors (developers only)" OFF)
+trojita_option(WITH_GNUPG "Build with GnuPG support" AUTO)
 
 if(WIN32)
     trojita_option(WITH_NSIS "Build Windows NSIS installer" AUTO)
@@ -76,16 +77,6 @@ endif()
 
 trojita_plugin_option(WITH_CLEARTEXT_PLUGIN "Build Cleartext password plugin" STATIC)
 trojita_plugin_option(WITH_QTKEYCHAIN_PLUGIN "Build Qtkeychain password plugin" "NOT WITH_HARMATTAN;NOT WITH_UBUNTU")
-
-include(FindGpgme)
-if(NOT GPGME_VANILLA_FOUND)
-	message(STATUS "Could not find GnuPG Made Easy (GPGME). OpenPGP suppoert disabled.")
-	if(GPGME_FOUND)
-		message(STATUS "Only vanilla GPGME is currently supported.")
-	endif()
-else()
-	include_directories(${GPGME_INCLUDES})
-endif()
 
 if(WITH_QT5)
     message(STATUS "Building the Qt5 version")
@@ -134,6 +125,8 @@ else()
 endif()
 
 trojita_find_package(Git "" "" "" "")
+
+trojita_find_package(QCA2 "" "" "Qt Cryptographic Architecture" "" WITH_GNUPG)
 
 if(WIN32)
     trojita_find_package(MakeNSIS "" "http://nsis.sourceforge.net" "Nullsoft Scriptable Install System" "Needed for building Windows installer" WITH_NSIS)
@@ -268,9 +261,6 @@ else()
     message(STATUS "Disabling COMPRESS=DEFLATE, zlib is not available")
 endif()
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/configure.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/configure.cmake.h)
-
 feature_summary(FATAL_ON_MISSING_REQUIRED_PACKAGES DESCRIPTION "\n" WHAT ALL)
 
 set(path_Common ${CMAKE_CURRENT_SOURCE_DIR}/src/Common)
@@ -389,7 +379,6 @@ set(libDesktopGui_SOURCES
     ${path_DesktopGui}/MessageView.cpp
     ${path_DesktopGui}/MsgListView.cpp
     ${path_DesktopGui}/OnePanelAtTimeWidget.cpp
-    ${path_DesktopGui}/OpenPGPView.cpp
     ${path_DesktopGui}/OverlayWidget.cpp
     ${path_DesktopGui}/PartWidget.cpp
     ${path_DesktopGui}/PartWidgetFactory.cpp
@@ -428,6 +417,20 @@ set(libDesktopGui_RESOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/license.qrc
 )
 
+if(WITH_GNUPG)
+  set(TROJITA_HAVE_GNUPG True)
+  set(libDesktopGui_HEADERS ${libDesktopGui_HEADERS}
+    ${path_DesktopGui}/OpenPGPView.h)
+  set(libDesktopGui_SOURCES ${libDesktopGui_SOURCES}
+    ${path_DesktopGui}/OpenPGPView.cpp)
+else(WITH_GNUPG)
+  set(TROJITA_HAVE_GNUPG False)
+endif(WITH_GNUPG)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/configure.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/configure.cmake.h)
+
+set(libqwwsmtpclient_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/qwwsmtpclient/qwwsmtpclient.h)
 set(libqwwsmtpclient_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/qwwsmtpclient/qwwsmtpclient.cpp)
 
 set(libAppVersion_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/AppVersion/SetCoreApplication.cpp)
@@ -732,13 +735,13 @@ if(WITH_DESKTOP)
     if(SUPPORTS_TARGET_INCLUDES)
         set_property(TARGET DesktopGui APPEND PROPERTY INCLUDE_DIRECTORIES ${path_DesktopGui})
     endif()
-    target_link_libraries(DesktopGui Common UiUtils Composer Imap MSA Plugins Streams qwwsmtpclient AbookAddressbook ${QT_QTWEBKIT_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
+    target_link_libraries(DesktopGui Common UiUtils Composer Imap MSA Plugins Streams qwwsmtpclient AbookAddressbook ${QT_QTWEBKIT_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY} ${QCA2_LIBRARIES})
 
     # On Windows build a real Win32 GUI application without console window
     # On other platforms WIN32 flag is ignored
     add_executable(trojita WIN32 ${trojita_desktop_SOURCES} ${trojita_QM})
     set_property(TARGET trojita APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
-    target_link_libraries(trojita AppVersion Common UiUtils DesktopGui ${STATIC_PLUGINS} ${QT_QTMAIN_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY} ${GPGME_VANILLA_LIBRARIES})
+    target_link_libraries(trojita AppVersion Common UiUtils DesktopGui ${STATIC_PLUGINS} ${QT_QTMAIN_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
     if(NOT WITH_QT5)
         target_link_libraries(trojita MimetypesQt4)
     endif()
