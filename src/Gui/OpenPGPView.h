@@ -31,8 +31,14 @@ public:
                 const PartWidgetFactory::PartLoadingOptions options);
     virtual QString quoteMe() const;
     virtual void reloadContents();
+    bool verify(const QModelIndex &textIndex, const QModelIndex &sigIndex);
+
 private slots:
-    void handleDataChanged(QModelIndex topLeft, QModelIndex bottomDown);
+    void handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomDown);
+
+private:
+    const Imap::Mailbox::Model *m_model;
+    QModelIndex m_partIndex;
 };
 }
 
