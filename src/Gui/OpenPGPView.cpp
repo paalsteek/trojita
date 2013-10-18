@@ -31,15 +31,6 @@
 #include "Imap/Model/MailboxTree.h"
 #include "Imap/Model/Model.h"
 
-namespace {
-
-    /** @short Unset flags which only make sense for one level of nesting */
-    Gui::PartWidgetFactory::PartLoadingOptions filteredForEmbedding(const Gui::PartWidgetFactory::PartLoadingOptions options)
-    {
-        return options & Gui::PartWidgetFactory::MASK_PROPAGATE_WHEN_EMBEDDING;
-    }
-}
-
 namespace Gui
 {
 
@@ -59,7 +50,7 @@ void OpenPGPView::startVerification(PartWidgetFactory* factory, const int recurs
         setTitle(tr("Malformed multipart/signed message: only one nested part"));
         QModelIndex anotherPart = m_partIndex.child(0, 0);
         Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, filteredForEmbedding(options)));
+        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, options));
     } else if (childrenCount != 2) {
         QLabel *lbl = new QLabel(tr("Malformed multipart/signed message: %1 nested parts").arg(QString::number(childrenCount)), this);
         layout->addWidget(lbl);
@@ -76,7 +67,7 @@ void OpenPGPView::startVerification(PartWidgetFactory* factory, const int recurs
 
         QModelIndex anotherPart = m_partIndex.child(0, 0);
         Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, filteredForEmbedding(options)));
+        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, options));
 
         //Trigger lazy loading of the required message parts
         m_partIndex.child(0,0).data(Imap::Mailbox::RolePartData);
