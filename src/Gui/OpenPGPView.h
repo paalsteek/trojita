@@ -61,6 +61,7 @@ private slots:
 
 private:
     void verify(const QModelIndex &textIndex, const QModelIndex &sigIndex);
+    QString strerror(QCA::SecureMessage::Error error);
     const Imap::Mailbox::Model *m_model;
     QPersistentModelIndex m_partIndex;
     QCA::SecureMessage *m_msg;

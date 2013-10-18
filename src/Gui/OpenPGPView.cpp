@@ -120,30 +120,30 @@ void OpenPGPView::reloadContents()
     }
 }
 
-QString strerror(QCA::SecureMessage::Error error)
+QString OpenPGPView::strerror(QCA::SecureMessage::Error error)
 {
     switch(error)
     {
     case QCA::SecureMessage::ErrorCertKeyMismatch:
-        return "certificate and private key don't match";
+        return tr("certificate and private key don't match");
     case QCA::SecureMessage::ErrorPassphrase:
-        return "passphrase was either wrong or not provided";
+        return tr("passphrase was either wrong or not provided");
     case QCA::SecureMessage::ErrorFormat:
-        return "input format was bad";
+        return tr("input format was bad");
     case QCA::SecureMessage::ErrorSignerExpired:
-        return "signing key is expired";
+        return tr("signing key is expired");
     case QCA::SecureMessage::ErrorSignerInvalid:
-        return "signing key is invalid in some way";
+        return tr("signing key is invalid in some way");
     case QCA::SecureMessage::ErrorEncryptExpired:
-        return "encrypting key is expired";
+        return tr("encrypting key is expired");
     case QCA::SecureMessage::ErrorEncryptUntrusted:
-        return "encrypting key is untrusted";
+        return tr("encrypting key is untrusted");
     case QCA::SecureMessage::ErrorEncryptInvalid:
-        return "encrypting key is invalid in some way";
+        return tr("encrypting key is invalid in some way");
     case QCA::SecureMessage::ErrorNeedCard:
-        return "pgp card is missing";
+        return tr("pgp card is missing");
     default:
-        return "other error";
+        return tr("other error");
     }
 }
 
