@@ -24,6 +24,8 @@
 #include <QSettings>
 #include <QTranslator>
 
+#include <QtCrypto/QtCrypto>
+
 #include "AppVersion/SetCoreApplication.h"
 #include "Common/Application.h"
 #include "Common/MetaTypes.h"
@@ -60,6 +62,8 @@ int main(int argc, char **argv)
     QTranslator appDirectoryTranslator;
     appDirectoryTranslator.load(localeName, app.applicationDirPath() + localeSuffix);
     app.installTranslator(&appDirectoryTranslator);
+
+    QCA::Initializer init;
 
     AppVersion::setGitVersion();
     AppVersion::setCoreApplicationData();

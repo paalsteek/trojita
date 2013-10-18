@@ -22,6 +22,8 @@
 #ifndef OPENPGPVIEW_H
 #define OPENPGPVIEW_H
 
+#include <QtCrypto/QtCrypto>
+
 #include <QGroupBox>
 #include <QModelIndex>
 #include <QVBoxLayout>
@@ -48,18 +50,21 @@ class OpenPGPView : public QGroupBox, public AbstractPartWidget
     Q_OBJECT
 
 public:
-    OpenPGPView(QWidget *parent, PartWidgetFactory *factory, const QModelIndex &partIndex, const int recursionDepth,
-                const PartWidgetFactory::PartLoadingOptions options);
+    OpenPGPView(QWidget *parent, const QModelIndex &partIndex);
     virtual QString quoteMe() const;
     virtual void reloadContents();
-    bool verify(const QModelIndex &textIndex, const QModelIndex &sigIndex);
+    void startVerification(PartWidgetFactory* factory, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
 
 private slots:
     void handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomDown);
+    void slotDisplayResult();
 
 private:
+    void verify(const QModelIndex &textIndex, const QModelIndex &sigIndex);
     const Imap::Mailbox::Model *m_model;
-    QModelIndex m_partIndex;
+    QPersistentModelIndex m_partIndex;
+    QCA::SecureMessage *m_msg;
+    QCA::OpenPGP *m_pgp;
 };
 }
 

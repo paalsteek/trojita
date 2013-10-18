@@ -24,8 +24,6 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
-#include <QtCrypto/QtCrypto>
-
 #include <QDebug>
 
 #include "MessageView.h"
@@ -45,19 +43,21 @@ namespace {
 namespace Gui
 {
 
-OpenPGPView::OpenPGPView(QWidget *parent, PartWidgetFactory *factory,
-                         const QModelIndex &partIndex, const int recursionDepth,
-                         const PartWidgetFactory::PartLoadingOptions options)
-    : QGroupBox(tr("OpenPGP signed message"), parent), m_model(0), m_partIndex(partIndex)
+OpenPGPView::OpenPGPView(QWidget *parent, const QModelIndex &partIndex)
+    : QGroupBox(parent), m_model(0), m_partIndex(partIndex)
 {
     setFlat(true);
     using namespace Imap::Mailbox;
+}
+
+void OpenPGPView::startVerification(PartWidgetFactory* factory, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options)
+{
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setSpacing(0);
-    uint childrenCount = partIndex.model()->rowCount(partIndex);
+    uint childrenCount = m_partIndex.model()->rowCount(m_partIndex);
     if (childrenCount == 1) {
         setTitle(tr("Malformed multipart/signed message: only one nested part"));
-        QModelIndex anotherPart = partIndex.child(0, 0);
+        QModelIndex anotherPart = m_partIndex.child(0, 0);
         Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
         layout->addWidget(factory->create(anotherPart, recursionDepth + 1, filteredForEmbedding(options)));
     } else if (childrenCount != 2) {
@@ -65,20 +65,26 @@ OpenPGPView::OpenPGPView(QWidget *parent, PartWidgetFactory *factory,
         layout->addWidget(lbl);
         return;
     } else {
+        setTitle(tr("OpenPGP signed message"));
         Q_ASSERT(childrenCount == 2); // from the if logic; FIXME: refactor
-        QModelIndex anotherPart = partIndex.child(0, 0);
+
+        m_pgp = new QCA::OpenPGP();
+        m_msg = new QCA::SecureMessage(m_pgp);
+        Imap::Mailbox::Model::realTreeItem(m_partIndex, &m_model);
+        Q_ASSERT(m_model);
+        connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForVerification(QModelIndex,QModelIndex)));
+
+        QModelIndex anotherPart = m_partIndex.child(0, 0);
         Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
         layout->addWidget(factory->create(anotherPart, recursionDepth + 1, filteredForEmbedding(options)));
 
-        Imap::Mailbox::Model::realTreeItem(partIndex, &m_model);
-        Q_ASSERT(m_model);
-        connect(m_model, SIGNAL(dataChanged(QModelIndex, QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
+        //Trigger lazy loading of the required message parts
+        m_partIndex.child(0,0).data(Imap::Mailbox::RolePartData);
+        m_partIndex.child(0,0).child(0,Imap::Mailbox::TreeItem::OFFSET_MIME).data(Imap::Mailbox::RolePartData);
+        m_partIndex.child(1,0).data(Imap::Mailbox::RolePartData);
 
-        Imap::Mailbox::TreeItemPart *partPart = dynamic_cast<Imap::Mailbox::TreeItemPart *>(Imap::Mailbox::Model::realTreeItem(partIndex, &m_model));
-
-        partPart->child(0,0)->fetch(const_cast<Imap::Mailbox::Model *>(m_model));
-        partPart->child(0,0)->specialColumnPtr(0,Imap::Mailbox::TreeItem::OFFSET_MIME)->fetch(const_cast<Imap::Mailbox::Model *>(m_model));
-        partPart->child(1,0)->fetch(const_cast<Imap::Mailbox::Model *>(m_model));
+        //call handleDataChanged at least once in case all parts are already available
+        handleDataChanged(QModelIndex(),QModelIndex());
     }
 }
 
@@ -150,7 +156,7 @@ QString strerror(QCA::SecureMessage::Error error)
     }
 }
 
-bool OpenPGPView::verify(const QModelIndex &textIndex, const QModelIndex &sigIndex)
+void OpenPGPView::verify(const QModelIndex &textIndex, const QModelIndex &sigIndex)
 {
     QModelIndex mimePart = textIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_MIME);
     Q_ASSERT(mimePart.isValid());
@@ -161,39 +167,50 @@ bool OpenPGPView::verify(const QModelIndex &textIndex, const QModelIndex &sigInd
     qDebug() << rawsigned_text.data();
     qDebug() << sigIndex.data(Imap::Mailbox::RolePartData).toByteArray();
 
-    QCA::Initializer init;
-    QCA::OpenPGP pgp;
-    QCA::SecureMessage msg(&pgp);
+    connect(m_msg, SIGNAL(finished()), this, SLOT(slotDisplayResult()));
 
-    if ( !msg.signer().key().isNull() )
-        qDebug() << msg.signer().key().pgpPublicKey().userIds();
-    //msg.setRecipient(to);
-    msg.setFormat(QCA::SecureMessage::Ascii);
-    msg.startVerify(sigIndex.data(Imap::Mailbox::RolePartData).toByteArray());
-    msg.update(rawsigned_text.data());
-    msg.end();
-    msg.waitForFinished(2000);
+    m_msg->setFormat(QCA::SecureMessage::Ascii);
+    m_msg->startVerify(sigIndex.data(Imap::Mailbox::RolePartData).toByteArray());
+    m_msg->update(rawsigned_text.data());
+    m_msg->end();
+}
 
+void OpenPGPView::slotDisplayResult()
+{
     QLabel *lbl = new QLabel((QWidget*) parent());
+    QFrame *pgpFrame = new QFrame();
+    pgpFrame->setFrameStyle(QFrame::StyledPanel | QFrame::Raised);
+    //TODO: set background color depending on result
 
-    if (!msg.success())
+    if (!m_msg->success())
     {
-        lbl->setText(tr("Signature verification failed. %1").arg(strerror(msg.errorCode())));
-        qDebug() << "failed: " << msg.diagnosticText();
+        lbl->setText(tr("Signature verification failed. %1").arg(strerror(m_msg->errorCode())));
+        qDebug() << "failed: " << m_msg->diagnosticText();
     } else {
         QString signer;
         QCA::KeyStoreManager manager;
         QCA::KeyStoreManager::start();
         manager.waitForBusyFinished();
         QCA::KeyStore store("qca-gnupg", &manager);
-        foreach(QCA::KeyStoreEntry entry, store.entryList())
-            if ( entry.id() == msg.signer().key().pgpPublicKey().keyId() )
-                signer = entry.pgpPublicKey().primaryUserId();
-        lbl->setText(tr("Signature with key \"%1\" (%2) successfully verified.").arg(signer).arg(msg.signer().key().pgpPublicKey().keyId()));
+        QCA::PGPKey key = m_msg->signer().key().pgpPublicKey();
+        Q_FOREACH(QCA::KeyStoreEntry entry, store.entryList())
+        {
+            if ( entry.id() == key.keyId() )
+            {
+                if ( !key.isNull() )
+                {
+                    signer = key.primaryUserId();
+                }
+            }
+        }
+        lbl->setText(tr("Signature with key \"%1\" (%2) successfully verified.").arg(signer, key.keyId()));
     }
-    this->layout()->addWidget(lbl);
+    QVBoxLayout *l = new QVBoxLayout();
+    l->addWidget(lbl);
+    pgpFrame->setLayout(l);
+    this->layout()->addWidget(pgpFrame);
+}
 
-    return msg.success() && msg.verifySuccess();
 }
 
 }

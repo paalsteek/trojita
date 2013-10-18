@@ -154,7 +154,9 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
         } else if (mimeType == QLatin1String("multipart/signed")) {
 #ifdef TROJITA_HAVE_GNUPG
             if (partIndex.data(RolePartProtocol).toString() == QLatin1String("application/pgp-signature")) {
-                return new OpenPGPView(0, this, partIndex, recursionDepth, loadingMode);
+                OpenPGPView *v = new OpenPGPView(0, partIndex);
+                v->startVerification(this, recursionDepth, loadingMode);
+                return v;
             } else
 #endif //TROJITA_HAVE_GNUPG
                 return new MultipartSignedWidget(0, this, partIndex, recursionDepth, loadingMode);
