@@ -54,13 +54,17 @@ public:
     virtual QString quoteMe() const;
     virtual void reloadContents();
     void startVerification(PartWidgetFactory* factory, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
+    void startDecryption(PartWidgetFactory* factory, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
 
 private slots:
-    void handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomDown);
-    void slotDisplayResult();
+    void handleDataChangedForVerification(const QModelIndex &topLeft, const QModelIndex &bottomDown);
+    void handleDataChangedForDecryption(const QModelIndex &topLeft, const QModelIndex &bottomDown);
+    void slotDisplayVerificationResult();
+    void slotDisplayDecryptionResult();
 
 private:
     void verify(const QModelIndex &textIndex, const QModelIndex &sigIndex);
+    void decrypt(const QModelIndex &versionIndex, const QModelIndex &encIndex);
     QString strerror(QCA::SecureMessage::Error error);
     const Imap::Mailbox::Model *m_model;
     QPersistentModelIndex m_partIndex;

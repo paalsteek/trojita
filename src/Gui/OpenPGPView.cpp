@@ -53,7 +53,7 @@ void OpenPGPView::startVerification(PartWidgetFactory* factory, const int recurs
         layout->addWidget(factory->create(anotherPart, recursionDepth + 1, options));
     } else if (childrenCount != 2) {
         QLabel *lbl = new QLabel(tr("Malformed multipart/signed message: %1 nested parts").arg(QString::number(childrenCount)), this);
-        layout->addWidget(lbl);
+        layout->addWidget(lbl); //TODO: show those parts here?
         return;
     } else {
         setTitle(tr("OpenPGP signed message"));
@@ -75,7 +75,40 @@ void OpenPGPView::startVerification(PartWidgetFactory* factory, const int recurs
         m_partIndex.child(1,0).data(Imap::Mailbox::RolePartData);
 
         //call handleDataChanged at least once in case all parts are already available
-        handleDataChanged(QModelIndex(),QModelIndex());
+        handleDataChangedForVerification(QModelIndex(),QModelIndex());
+    }
+}
+
+void OpenPGPView::startDecryption(PartWidgetFactory* factory, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options)
+{
+    QVBoxLayout *layout = new QVBoxLayout(this);
+    layout->setSpacing(0);
+    uint childrenCount = m_partIndex.model()->rowCount(m_partIndex);
+    if (childrenCount == 1) {
+        setTitle(tr("Malformed multipart/encrypted message: only one nested part"));
+        QModelIndex anotherPart = m_partIndex.child(0, 0);
+        Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
+        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, options));
+    } else if (childrenCount != 2) {
+        QLabel *lbl = new QLabel(tr("Malformed multipart/encrypted message: %1 nested parts").arg(QString::number(childrenCount)), this);
+        layout->addWidget(lbl); //TODO: show those parts here?
+        return;
+    } else {
+        setTitle(tr("OpenPGP encrypted message"));
+        Q_ASSERT(childrenCount == 2); // from the if logic; FIXME: refactor
+
+        m_pgp = new QCA::OpenPGP();
+        m_msg = new QCA::SecureMessage(m_pgp);
+        Imap::Mailbox::Model::realTreeItem(m_partIndex, &m_model);
+        Q_ASSERT(m_model);
+        connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForDecryption(QModelIndex,QModelIndex)));
+
+        //Trigger lazy loading of the required message parts
+        m_partIndex.child(0,0).data(Imap::Mailbox::RolePartData);
+        m_partIndex.child(1,0).data(Imap::Mailbox::RolePartData);
+
+        //call handleDataChanged at least once in case all parts are already available
+        handleDataChangedForDecryption(QModelIndex(),QModelIndex());
     }
 }
 
@@ -90,7 +123,7 @@ QString OpenPGPView::quoteMe() const
     return res.join("\n");
 }
 
-void OpenPGPView::handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+void OpenPGPView::handleDataChangedForVerification(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
     Q_UNUSED(topLeft)
     Q_UNUSED(bottomRight)
@@ -101,9 +134,26 @@ void OpenPGPView::handleDataChanged(const QModelIndex &topLeft, const QModelInde
          m_partIndex.child(1,0).data(Imap::Mailbox::RoleIsFetched).toBool() )
     {
         qDebug() << "data fetched";
-        disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
+        disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForVerification(QModelIndex,QModelIndex)));
 
         verify(m_partIndex.child(0,0), m_partIndex.child(1,0));
+    }
+
+}
+
+void OpenPGPView::handleDataChangedForDecryption(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+{
+    Q_UNUSED(topLeft)
+    Q_UNUSED(bottomRight)
+
+    qDebug() << "handleDataChanged";
+    if ( m_partIndex.child(0,0).data(Imap::Mailbox::RoleIsFetched).toBool() &&
+         m_partIndex.child(1,0).data(Imap::Mailbox::RoleIsFetched).toBool() )
+    {
+        qDebug() << "data fetched";
+        disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForDecryption(QModelIndex,QModelIndex)));
+
+        decrypt(m_partIndex.child(0,0), m_partIndex.child(1,0));
     }
 
 }
@@ -158,7 +208,7 @@ void OpenPGPView::verify(const QModelIndex &textIndex, const QModelIndex &sigInd
     qDebug() << rawsigned_text.data();
     qDebug() << sigIndex.data(Imap::Mailbox::RolePartData).toByteArray();
 
-    connect(m_msg, SIGNAL(finished()), this, SLOT(slotDisplayResult()));
+    connect(m_msg, SIGNAL(finished()), this, SLOT(slotDisplayVerificationResult()));
 
     m_msg->setFormat(QCA::SecureMessage::Ascii);
     m_msg->startVerify(sigIndex.data(Imap::Mailbox::RolePartData).toByteArray());
@@ -166,7 +216,7 @@ void OpenPGPView::verify(const QModelIndex &textIndex, const QModelIndex &sigInd
     m_msg->end();
 }
 
-void OpenPGPView::slotDisplayResult()
+void OpenPGPView::slotDisplayVerificationResult()
 {
     QLabel *lbl = new QLabel((QWidget*) parent());
     QFrame *pgpFrame = new QFrame();
@@ -202,6 +252,42 @@ void OpenPGPView::slotDisplayResult()
     this->layout()->addWidget(pgpFrame);
 }
 
+void OpenPGPView::decrypt(const QModelIndex &versionIndex, const QModelIndex &encIndex)
+{
+    if ( !versionIndex.data(Imap::Mailbox::RolePartData).toString().contains(QLatin1String("Version: 1")) ) //TODO: replace != with some regex matching or similar
+    {
+        this->layout()->addWidget(new QLabel(tr("Unsupported Version"))); //TODO: this message should be more helpful
+        return;
+    }
+
+    connect(m_msg, SIGNAL(finished()), this, SLOT(slotDisplayDecryptionResult()));
+
+    m_msg->setFormat(QCA::SecureMessage::Ascii);
+    m_msg->startDecrypt();
+    m_msg->update(encIndex.data(Imap::Mailbox::RolePartData).toByteArray().data());
+    m_msg->end();
+}
+
+void OpenPGPView::slotDisplayDecryptionResult()
+{
+    QLabel *lbl = new QLabel((QWidget*) parent());
+
+    if (!m_msg->success())
+    {
+        lbl->setText(tr("Decryption failed. %1").arg(strerror(m_msg->errorCode())));
+        qDebug() << "failed: " << m_msg->diagnosticText();
+    } else {
+        lbl->setText(tr("Message decrypted")); //TODO: what to do with the decrypted message
+        qDebug() << "Message:";
+        while ( m_msg->bytesAvailable() )
+            qDebug() << m_msg->read();
+    }
+    QVBoxLayout *l = new QVBoxLayout();
+    l->addWidget(lbl);
+    QFrame *pgpFrame = new QFrame();
+    pgpFrame->setLayout(l);
+    pgpFrame->setFrameStyle(QFrame::StyledPanel | QFrame::Raised);
+    this->layout()->addWidget(pgpFrame);
 }
 
 }

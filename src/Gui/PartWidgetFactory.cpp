@@ -160,6 +160,16 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
             } else
 #endif //TROJITA_HAVE_GNUPG
                 return new MultipartSignedWidget(0, this, partIndex, recursionDepth, loadingMode);
+        } else if (mimeType == QLatin1String("multipart/encrypted")) {
+#ifdef TROJITA_HAVE_GNUPG
+            if (partIndex.data(RolePartProtocol).toString() == QLatin1String("application/pgp-encrypted")) {
+                OpenPGPView *v = new OpenPGPView(0, partIndex);
+                v->startDecryption(this, recursionDepth, loadingMode);
+                return v;
+            } else
+#endif //TROJITA_HAVE_GNUPG
+            // Currently we have no generic handling for multipart/encrypted mails so use the GenericMultipartWidget
+                return new GenericMultipartWidget(0, this, partIndex, recursionDepth, loadingMode);
         } else if (mimeType == QLatin1String("multipart/related")) {
             // The purpose of this section is to find a text/html e-mail, along with its associated body parts, and hide
             // everything else than the HTML widget.
