@@ -190,7 +190,7 @@ void OpenPGPView::slotDisplayResult()
             {
                 if ( !key.isNull() )
                 {
-                    signer = key.primaryUserId();
+                    //signer = key.primaryUserId();
                 }
             }
         }
