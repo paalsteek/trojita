@@ -64,6 +64,7 @@ public:
 
     MessageView *messageView() const;
     void setNetworkWatcher(Imap::Mailbox::NetworkWatcher *netWatcher);
+    static PartWidgetFactory::PartLoadingOptions filteredForEmbedding(const PartWidgetFactory::PartLoadingOptions options);
 private:
     Imap::Network::MsgPartNetAccessManager *manager;
     MessageView *m_messageView;

@@ -246,4 +246,9 @@ void PartWidgetFactory::setNetworkWatcher(Imap::Mailbox::NetworkWatcher *netWatc
     m_netWatcher = netWatcher;
 }
 
+/** @short Unset flags which only make sense for one level of nesting */
+PartWidgetFactory::PartLoadingOptions PartWidgetFactory::filteredForEmbedding(const PartWidgetFactory::PartLoadingOptions options)
+{
+    return options & PartWidgetFactory::MASK_PROPAGATE_WHEN_EMBEDDING;
+}
 }
