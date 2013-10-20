@@ -29,10 +29,13 @@
 #include <QString>
 #include "../Parser/Response.h"
 #include "../Parser/Message.h"
+#include "../Parser/MimeParser.h"
 #include "MailboxMetadata.h"
 
 namespace Imap
 {
+
+class MimeParser;
 
 namespace Mailbox
 {
@@ -44,6 +47,7 @@ class KeepMailboxOpenTask;
 class TreeItem
 {
     friend class Model; // for m_loading and m_fetched
+    friend class Imap::MimeParser; // for m_fetchStatus
     TreeItem(const TreeItem &); // don't implement
     void operator=(const TreeItem &);  // don't implement
     friend class DeleteMailboxTask; // for direct access to m_children
@@ -297,6 +301,7 @@ class TreeItemPart: public TreeItem
     void operator=(const TreeItem &);  // don't implement
     friend class TreeItemMailbox; // needs access to m_data
     friend class Model; // dtto
+    friend class Imap::MimeParser; // dtto
     QByteArray m_mimeType;
     QByteArray m_charset;
     QByteArray m_contentFormat;

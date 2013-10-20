@@ -70,6 +70,7 @@ trojita_option(WITH_SHARED_PLUGINS "Enable shared dynamic plugins" ON "NOT UBUNT
 trojita_option(WITH_TESTS "Build tests" ON "NOT WITH_HARMATTAN")
 trojita_option(DEV_FATAL_WARNINGS "Turn build warnings into errors (developers only)" OFF)
 trojita_option(WITH_GNUPG "Build with GnuPG support" AUTO)
+trojita_option(WITH_MIMETIC "Build with MIME parser" AUTO)
 
 if(WIN32)
     trojita_option(WITH_NSIS "Build Windows NSIS installer" AUTO)
@@ -127,6 +128,7 @@ endif()
 trojita_find_package(Git "" "" "" "")
 
 trojita_find_package(QCA2 "" "" "Qt Cryptographic Architecture" "" WITH_GNUPG)
+trojita_find_package(Mimetic "" "" "" "" WITH_MIMETIC)
 
 if(WIN32)
     trojita_find_package(MakeNSIS "" "http://nsis.sourceforge.net" "Nullsoft Scriptable Install System" "Needed for building Windows installer" WITH_NSIS)
@@ -427,9 +429,6 @@ else(WITH_GNUPG)
   set(TROJITA_HAVE_GNUPG False)
 endif(WITH_GNUPG)
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/configure.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/configure.cmake.h)
-
 set(libqwwsmtpclient_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/qwwsmtpclient/qwwsmtpclient.h)
 set(libqwwsmtpclient_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/qwwsmtpclient/qwwsmtpclient.cpp)
 
@@ -539,6 +538,17 @@ else()
     set(libImap_SOURCES ${libImap_SOURCES}
         ${path_Imap}/Parser/Rfc5322HeaderParser.generated.cpp)
 endif()
+
+if(WITH_MIMETIC)
+    set(TROJITA_HAVE_MIMETIC True)
+    set(libImap_SOURCES ${libImap_SOURCES}
+        ${path_Imap}/Parser/MimeParser.cpp)
+else()
+    set(TROJITA_HAVE_MIMETIC False)
+endif()
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/configure.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/configure.cmake.h)
 
 set(path_AbookAddressbook ${CMAKE_CURRENT_SOURCE_DIR}/src/AbookAddressbook)
 set(libAbookAddressbook_SOURCES
@@ -669,6 +679,9 @@ set_property(TARGET Imap APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASC
 target_link_libraries(Imap Common Streams UiUtils ${QT_QTNETWORK_LIBRARY} ${QT_QTSQL_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
 if(WITH_ZLIB)
     target_link_libraries(Imap ${ZLIB_LIBRARIES})
+endif()
+if(WITH_MIMETIC)
+    target_link_libraries(Imap ${MIMETIC_LIBRARIES})
 endif()
 
 if(NOT WITH_QT5)

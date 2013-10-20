@@ -50,11 +50,11 @@ class OpenPGPView : public QGroupBox, public AbstractPartWidget
     Q_OBJECT
 
 public:
-    OpenPGPView(QWidget *parent, const QModelIndex &partIndex);
+    OpenPGPView(QWidget *parent, PartWidgetFactory *factory, const QModelIndex &partIndex, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
     virtual QString quoteMe() const;
     virtual void reloadContents();
-    void startVerification(PartWidgetFactory* factory, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
-    void startDecryption(PartWidgetFactory* factory, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
+    void startVerification();
+    void startDecryption();
 
 private slots:
     void handleDataChangedForVerification(const QModelIndex &topLeft, const QModelIndex &bottomDown);
@@ -68,6 +68,9 @@ private:
     QString strerror(QCA::SecureMessage::Error error);
     const Imap::Mailbox::Model *m_model;
     QPersistentModelIndex m_partIndex;
+    PartWidgetFactory *m_factory;
+    const int m_recursionDepth;
+    PartWidgetFactory::PartLoadingOptions m_options;
     QCA::SecureMessage *m_msg;
     QCA::OpenPGP *m_pgp;
 };

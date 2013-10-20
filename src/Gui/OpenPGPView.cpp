@@ -26,22 +26,24 @@
 
 #include <QDebug>
 
+#include "configure.cmake.h"
 #include "MessageView.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 #include "Imap/Model/Model.h"
+#include "Imap/Parser/MimeParser.h"
 
 namespace Gui
 {
 
-OpenPGPView::OpenPGPView(QWidget *parent, const QModelIndex &partIndex)
-    : QGroupBox(parent), m_model(0), m_partIndex(partIndex)
+OpenPGPView::OpenPGPView(QWidget *parent, PartWidgetFactory* factory, const QModelIndex &partIndex, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options)
+    : QGroupBox(parent), m_model(0), m_partIndex(partIndex), m_factory(factory), m_recursionDepth(recursionDepth), m_options(options)
 {
     setFlat(true);
     using namespace Imap::Mailbox;
 }
 
-void OpenPGPView::startVerification(PartWidgetFactory* factory, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options)
+void OpenPGPView::startVerification()
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setSpacing(0);
@@ -50,7 +52,7 @@ void OpenPGPView::startVerification(PartWidgetFactory* factory, const int recurs
         setTitle(tr("Malformed multipart/signed message: only one nested part"));
         QModelIndex anotherPart = m_partIndex.child(0, 0);
         Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, options));
+        layout->addWidget(m_factory->create(anotherPart, m_recursionDepth + 1, PartWidgetFactory::filteredForEmbedding(m_options)));
     } else if (childrenCount != 2) {
         QLabel *lbl = new QLabel(tr("Malformed multipart/signed message: %1 nested parts").arg(QString::number(childrenCount)), this);
         layout->addWidget(lbl); //TODO: show those parts here?
@@ -67,7 +69,7 @@ void OpenPGPView::startVerification(PartWidgetFactory* factory, const int recurs
 
         QModelIndex anotherPart = m_partIndex.child(0, 0);
         Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, options));
+        layout->addWidget(m_factory->create(anotherPart, m_recursionDepth + 1, PartWidgetFactory::filteredForEmbedding(m_options)));
 
         //Trigger lazy loading of the required message parts
         m_partIndex.child(0,0).data(Imap::Mailbox::RolePartData);
@@ -79,7 +81,7 @@ void OpenPGPView::startVerification(PartWidgetFactory* factory, const int recurs
     }
 }
 
-void OpenPGPView::startDecryption(PartWidgetFactory* factory, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options)
+void OpenPGPView::startDecryption()
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setSpacing(0);
@@ -88,7 +90,7 @@ void OpenPGPView::startDecryption(PartWidgetFactory* factory, const int recursio
         setTitle(tr("Malformed multipart/encrypted message: only one nested part"));
         QModelIndex anotherPart = m_partIndex.child(0, 0);
         Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, options));
+        layout->addWidget(m_factory->create(anotherPart, m_recursionDepth + 1, PartWidgetFactory::filteredForEmbedding(m_options)));
     } else if (childrenCount != 2) {
         QLabel *lbl = new QLabel(tr("Malformed multipart/encrypted message: %1 nested parts").arg(QString::number(childrenCount)), this);
         layout->addWidget(lbl); //TODO: show those parts here?
@@ -254,7 +256,7 @@ void OpenPGPView::slotDisplayVerificationResult()
 
 void OpenPGPView::decrypt(const QModelIndex &versionIndex, const QModelIndex &encIndex)
 {
-    if ( !versionIndex.data(Imap::Mailbox::RolePartData).toString().contains(QLatin1String("Version: 1")) ) //TODO: replace != with some regex matching or similar
+    if ( !versionIndex.data(Imap::Mailbox::RolePartData).toString().contains(QLatin1String("Version: 1")) )
     {
         this->layout()->addWidget(new QLabel(tr("Unsupported Version"))); //TODO: this message should be more helpful
         return;
@@ -268,25 +270,47 @@ void OpenPGPView::decrypt(const QModelIndex &versionIndex, const QModelIndex &en
     m_msg->end();
 }
 
-void OpenPGPView::slotDisplayDecryptionResult()
+void OpenPGPView::slotDisplayDecryptionResult() // TODO: refactor this to be able to display already decrypted messages
 {
-    QLabel *lbl = new QLabel((QWidget*) parent());
+    QFrame *pgpFrame = new QFrame();
+    QVBoxLayout *layout = new QVBoxLayout(pgpFrame);
+    QLabel *lbl = new QLabel(pgpFrame);
+    pgpFrame->setLayout(layout);
+    pgpFrame->setFrameStyle(QFrame::StyledPanel | QFrame::Raised);
 
     if (!m_msg->success())
     {
         lbl->setText(tr("Decryption failed. %1").arg(strerror(m_msg->errorCode())));
+        layout->addWidget(lbl);
         qDebug() << "failed: " << m_msg->diagnosticText();
     } else {
-        lbl->setText(tr("Message decrypted")); //TODO: what to do with the decrypted message
+        lbl->setText(tr("Message decrypted"));
+        layout->addWidget(lbl);
         qDebug() << "Message:";
+        QByteArray message;
         while ( m_msg->bytesAvailable() )
-            qDebug() << m_msg->read();
+        {
+            message.append(m_msg->read());
+        }
+        qDebug() << message;
+#ifdef TROJITA_HAVE_MIMETIC
+        QModelIndex decryptedPart = m_partIndex.child(1,0);
+        Imap::MimeParser parser;
+        Imap::Mailbox::TreeItemPart *treeItem = dynamic_cast<Imap::Mailbox::TreeItemPart *>(m_model->realTreeItem(decryptedPart));
+        parser.parseMessage(message, treeItem);
+
+        setContentsMargins(0, 0, 0, 0);
+        // multipart/mixed or anything else, as mandated by RFC 2046, Section 5.1.3
+        layout->setSpacing(0);
+        for (int i = 0; i < decryptedPart.model()->rowCount(decryptedPart); ++i) {
+            using namespace Imap::Mailbox;
+            QModelIndex anotherPart = decryptedPart.child(i, 0);
+            Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
+            QWidget *res = m_factory->create(anotherPart, m_recursionDepth + 1, PartWidgetFactory::filteredForEmbedding(m_options) ); //TODO: pass options to here
+            layout->addWidget(res);
+        }
+#endif // TROJITA_HAVE_MIMETIC
     }
-    QVBoxLayout *l = new QVBoxLayout();
-    l->addWidget(lbl);
-    QFrame *pgpFrame = new QFrame();
-    pgpFrame->setLayout(l);
-    pgpFrame->setFrameStyle(QFrame::StyledPanel | QFrame::Raised);
     this->layout()->addWidget(pgpFrame);
 }
 
