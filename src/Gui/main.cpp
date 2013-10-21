@@ -24,7 +24,10 @@
 #include <QSettings>
 #include <QTranslator>
 
+#include "configure.cmake.h"
+#ifdef TROJITA_HAVE_GNUPG
 #include <QtCrypto/QtCrypto>
+#endif // TROJITA_HAVE_GNUPG
 
 #include "AppVersion/SetCoreApplication.h"
 #include "Common/Application.h"
@@ -63,7 +66,9 @@ int main(int argc, char **argv)
     appDirectoryTranslator.load(localeName, app.applicationDirPath() + localeSuffix);
     app.installTranslator(&appDirectoryTranslator);
 
+#ifdef TROJITA_HAVE_GNUPG
     QCA::Initializer init;
+#endif // TROJITA_HAVE_GNUPG
 
     AppVersion::setGitVersion();
     AppVersion::setCoreApplicationData();
