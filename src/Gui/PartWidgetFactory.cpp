@@ -25,7 +25,9 @@
 #include "MessageView.h" // so that the compiler knows that it's a QObject
 #include "LoadablePartWidget.h"
 #include "PartWidget.h"
+#ifdef TROJITA_HAVE_GNUPG
 #include "OpenPGPView.h"
+#endif // TROJITA_HAVE_GNUPG
 #include "SimplePartWidget.h"
 #include "Common/SettingsNames.h"
 #include "Imap/Model/ItemRoles.h"
