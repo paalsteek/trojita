@@ -33,8 +33,6 @@
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 
-#include <gpgme.h>
-
 namespace Gui
 {
 
