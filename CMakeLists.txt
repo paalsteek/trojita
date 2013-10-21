@@ -69,8 +69,8 @@ trojita_option(WITH_ZLIB "Build with zlib library" AUTO)
 trojita_option(WITH_SHARED_PLUGINS "Enable shared dynamic plugins" ON "NOT UBUNTU_CLICK_MODE")
 trojita_option(WITH_TESTS "Build tests" ON "NOT WITH_HARMATTAN")
 trojita_option(DEV_FATAL_WARNINGS "Turn build warnings into errors (developers only)" OFF)
-trojita_option(WITH_GNUPG "Build with GnuPG support" AUTO)
 trojita_option(WITH_MIMETIC "Build with MIME parser" AUTO)
+trojita_option(WITH_GNUPG "Build with GnuPG support" AUTO "WITH_MIMETIC")
 
 if(WIN32)
     trojita_option(WITH_NSIS "Build Windows NSIS installer" AUTO)
@@ -748,7 +748,10 @@ if(WITH_DESKTOP)
     if(SUPPORTS_TARGET_INCLUDES)
         set_property(TARGET DesktopGui APPEND PROPERTY INCLUDE_DIRECTORIES ${path_DesktopGui})
     endif()
-    target_link_libraries(DesktopGui Common UiUtils Composer Imap MSA Plugins Streams qwwsmtpclient AbookAddressbook ${QT_QTWEBKIT_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY} ${QCA2_LIBRARIES})
+    target_link_libraries(DesktopGui Common UiUtils Composer Imap MSA Plugins Streams qwwsmtpclient AbookAddressbook ${QT_QTWEBKIT_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
+    if(WITH_GNUPG)
+        target_link_libraries(DesktopGui ${QCA2_LIBRARIES})
+    endif()
 
     # On Windows build a real Win32 GUI application without console window
     # On other platforms WIN32 flag is ignored
