@@ -20,6 +20,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "configure.cmake.h"
 #include "MessageComposer.h"
 #include <QBuffer>
 #include <QMimeData>
@@ -38,6 +39,10 @@
 #include "Imap/Model/Model.h"
 #include "Imap/Model/Utils.h"
 
+#ifdef TROJITA_HAVE_GNUPG
+#include <QtCrypto/QtCrypto>
+#endif //TROJITA_HAVE_GNUPG
+
 namespace {
     static QString xTrojitaAttachmentList = QLatin1String("application/x-trojita-attachments-list");
     static QString xTrojitaMessageList = QLatin1String("application/x-trojita-message-list");
@@ -47,7 +52,7 @@ namespace {
 namespace Composer {
 
 MessageComposer::MessageComposer(Imap::Mailbox::Model *model, QObject *parent) :
-    QAbstractListModel(parent), m_model(model), m_shouldPreload(false)
+    QAbstractListModel(parent), m_model(model), m_shouldPreload(false), m_shouldSign(false), m_shouldEncrypt(false)
 {
 }
 
@@ -562,7 +567,10 @@ void MessageComposer::writeCommonMessageBeginning(QIODevice *target, const QByte
     if (!m_organization.isEmpty()) {
         target->write(encodeHeaderField(QLatin1String("Organization: ") + m_organization) + "\r\n");
     }
+}
 
+void MessageComposer::writeCommonMessageBody(QIODevice *target, const QByteArray boundary) const
+{
     // Headers depending on actual message body data
     if (!m_attachments.isEmpty()) {
         target->write("Content-Type: multipart/mixed;\r\n\tboundary=\"" + boundary + "\"\r\n"
@@ -658,6 +666,122 @@ bool MessageComposer::writeAttachmentBody(QIODevice *target, QString *errorMessa
     return true;
 }
 
+bool MessageComposer::signRawMessage(QIODevice *target, QByteArray &message) const
+{
+    // The OpenPGP standard requires the signed message to end with <CR><LF> according to RFC3156
+    if (!message.endsWith("\r\n"))
+        message.append("\r\n");
+
+    //TODO: asynchronous wait for msg
+    QCA::KeyStoreManager manager;
+    QCA::KeyStoreManager::start();
+    manager.waitForBusyFinished(); //TODO: synchronous wait?
+    QCA::KeyStore store("qca-gnupg", &manager);
+    QCA::SecureMessageKey key;
+
+    Q_FOREACH(QCA::KeyStoreEntry entry, store.entryList())
+    {
+        // TODO: implement a signature key selection based on the sender identity or a selected key ID in the settings
+        if (entry.id() == m_defaultKey)
+        {
+            if (!entry.pgpPublicKey().isNull())
+                key.setPGPPublicKey(entry.pgpPublicKey());
+
+            if (!entry.pgpSecretKey().isNull())
+                key.setPGPSecretKey(entry.pgpSecretKey());
+        }
+    }
+    if ( !key.havePrivate() )
+        return false;
+
+    qDebug() << "Signing:" << message;
+
+    QCA::OpenPGP *pgp = new QCA::OpenPGP();
+    QCA::SecureMessage msg(pgp);
+    msg.setSigner(key);
+    msg.setFormat(QCA::SecureMessage::Ascii);
+    msg.startSign(QCA::SecureMessage::Detached);
+    msg.update(message);
+    msg.end();
+    msg.waitForFinished();
+    if (!msg.success())
+    {
+        qDebug() << "Unable to sign message:" << msg.diagnosticText();
+        return false;
+    }
+    QByteArray sigBoundary(generateMimeBoundary());
+    target->write("Content-Type: multipart/signed; micalg=pgp-" + msg.hashName().toLocal8Bit() + ";\r\n"
+                  "\tprotocol=\"application/pgp-signature\";\r\n"
+                  "\tboundary=\"" + sigBoundary + "\"\r\n"
+                  "\r\nThis is an OpenPGP/MIME signed message (RFC 4880 and 3156)");
+    target->write("\r\n--" + sigBoundary + "\r\n");
+    target->write(message);
+    target->write("\r\n--" + sigBoundary + "\r\n");
+    target->write("Content-Type: application/pgp-signature; name=\"signature.asc\"\r\n"
+                  "Content-Description: OpenPGP digital signature\r\n"
+                  "Content-Disposition: attachment; filename=\"signature.asc\"\r\n"
+                  "\r\n");
+    target->write(msg.signature());
+    target->write("\r\n--" + sigBoundary + "--\r\n");
+    return true;
+}
+
+bool MessageComposer::encryptRawMessage(QIODevice *target, QByteArray &message) const
+{
+    //TODO: asynchronous wait for msg
+    QCA::KeyStoreManager manager;
+    QCA::KeyStoreManager::start();
+    manager.waitForBusyFinished(); //TODO: synchronous wait?
+    QCA::KeyStore store("qca-gnupg", &manager);
+
+    QCA::SecureMessageKeyList keys;
+
+    Q_FOREACH(QCA::KeyStoreEntry entry, store.entryList())
+    {
+        // TODO: select the encryption key based on the receipient address, also support multiple keys and allow encrypting with the senders key too
+        if (entry.id() == m_defaultKey)
+        {
+            if (!entry.pgpPublicKey().isNull())
+            {
+                QCA::SecureMessageKey key;
+                key.setPGPPublicKey(entry.pgpPublicKey());
+                keys.append(key);
+            }
+        }
+    }
+    // TODO: check whether all needed keys where found
+
+    QCA::OpenPGP *pgp = new QCA::OpenPGP();
+    QCA::SecureMessage msg(pgp);
+    msg.setRecipients(keys); //TODO: change to list of keys
+    msg.setFormat(QCA::SecureMessage::Ascii);
+    msg.startEncrypt();
+    msg.update(message);
+    msg.end();
+    // TODO: waitForFinished does not terminate. This might be fixed by asynchronous wait
+    msg.waitForFinished(); //TODO: synchronous wait?
+    if (!msg.success())
+    {
+        qDebug() << "Unable to encrypt message:" << msg.diagnosticText();
+        return false;
+    }
+    QByteArray encBoundary(generateMimeBoundary());
+    target->write("Content-Type: multipart/encrypted; protocol=\"application/pgp-encrypted\";\r\n"
+                  "\tboundary=\"" + encBoundary + "\"\r\n"
+                  "\r\nThis is an OpenPGP/MIME encrypted message (RFC 2440 and 3156)");
+    target->write("\r\n--" + encBoundary + "\r\n");
+    target->write("Content-Type: application/pgp-encrypted\r\n"
+                  "\r\nVersion: 1\r\n");
+    target->write("\r\n--" + encBoundary + "\r\n");
+    target->write("Content-Type: application/octet-stream; name=\"encrypted.asc\"\r\n"
+                  "Content-Description: OpenPGP encrypted message\r\n"
+                  "Content-Disposition: inline; filename=\"encrypted.asc\"\r\n"
+                  "\r\n");
+    target->write(msg.read());
+    target->write("\r\n--" + encBoundary + "--\r\n");
+    return true;
+}
+
 bool MessageComposer::asRawMessage(QIODevice *target, QString *errorMessage) const
 {
     // We don't bother with checking that our boundary is not present in the individual parts. That's arguably wrong,
@@ -667,15 +791,53 @@ bool MessageComposer::asRawMessage(QIODevice *target, QString *errorMessage) con
 
     writeCommonMessageBeginning(target, boundary);
 
+    QByteArray rawMessage;
+    QBuffer buf(&rawMessage);
+    buf.open(QIODevice::WriteOnly);
+
+    writeCommonMessageBody(&buf, boundary);
+
     if (!m_attachments.isEmpty()) {
         Q_FOREACH(const AttachmentItem *attachment, m_attachments) {
-            if (!writeAttachmentHeader(target, errorMessage, attachment, boundary))
+            if (!writeAttachmentHeader(&buf, errorMessage, attachment, boundary))
                 return false;
-            if (!writeAttachmentBody(target, errorMessage, attachment))
+            if (!writeAttachmentBody(&buf, errorMessage, attachment))
                 return false;
         }
-        target->write("\r\n--" + boundary + "--\r\n");
+        buf.write("\r\n--" + boundary + "--\r\n");
     }
+    buf.close();
+
+    if (m_shouldSign)
+    {
+        //buf.reset();
+        QByteArray signedMessage;
+        //buf.setBuffer(&signedMessage);
+        QBuffer sbuf(&signedMessage);
+        sbuf.open(QIODevice::WriteOnly);
+        if (!signRawMessage(&sbuf, rawMessage))
+            return false;
+
+        sbuf.close();
+        rawMessage = signedMessage;
+    }
+
+    if (m_shouldEncrypt)
+    {
+        //buf.reset();
+        QByteArray encryptedMessage;
+        //buf.setBuffer(&encryptedMessage);
+        QBuffer sbuf(&encryptedMessage);
+        sbuf.open(QIODevice::WriteOnly);
+        if (!encryptRawMessage(&sbuf, rawMessage))
+            return false;
+
+        sbuf.close();
+        rawMessage = encryptedMessage;
+    }
+
+    target->write(rawMessage);
+
     return true;
 }
 
@@ -691,6 +853,7 @@ bool MessageComposer::asCatenateData(QList<Imap::Mailbox::CatenatePair> &target,
         QBuffer io(&target.back().second);
         io.open(QIODevice::ReadWrite);
         writeCommonMessageBeginning(&io, boundary);
+        writeCommonMessageBody(&io, boundary);
     }
 
     if (!m_attachments.isEmpty()) {
@@ -798,6 +961,21 @@ void MessageComposer::setAttachmentContentDisposition(const QModelIndex &index, 
 void MessageComposer::setPreloadEnabled(const bool preload)
 {
     m_shouldPreload = preload;
+}
+
+void MessageComposer::setSignMessage(const bool sign)
+{
+    m_shouldSign = sign;
+}
+
+void MessageComposer::setEncryptMessage(const bool encrypt)
+{
+    m_shouldEncrypt = encrypt;
+}
+
+void MessageComposer::setDefaultKey(const QString key)
+{
+    m_defaultKey = key;
 }
 
 void MessageComposer::setReplyingToMessage(const QModelIndex &index)

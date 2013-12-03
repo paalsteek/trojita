@@ -23,6 +23,7 @@
 #include <QCoreApplication>
 #include <QBuffer>
 #include <QSettings>
+#include "Common/SettingsNames.h"
 #include "Composer/Submission.h"
 #include "Composer/MessageComposer.h"
 #include "Imap/Model/Model.h"
@@ -69,7 +70,7 @@ QString submissionProgressToString(const Submission::SubmissionProgress progress
     return QString::fromUtf8("[unknown: %1]").arg(QString::number(static_cast<int>(progress)));
 }
 
-Submission::Submission(QObject *parent, Imap::Mailbox::Model *model, MSA::MSAFactory *msaFactory) :
+Submission::Submission(QObject *parent, Imap::Mailbox::Model *model, MSA::MSAFactory *msaFactory, QSettings *settings) :
     QObject(parent),
     m_appendUidReceived(false), m_appendUidValidity(0), m_appendUid(0), m_genUrlAuthReceived(false),
     m_saveToSentFolder(false), m_useBurl(false), m_useImapSubmit(false), m_state(STATE_INIT),
@@ -78,6 +79,9 @@ Submission::Submission(QObject *parent, Imap::Mailbox::Model *model, MSA::MSAFac
 {
     m_composer = new Composer::MessageComposer(model, this);
     m_composer->setPreloadEnabled(shouldBuildMessageLocally());
+    m_composer->setSignMessage(settings->value(Common::SettingsNames::composerSignDefault, false).toBool());
+    m_composer->setEncryptMessage(settings->value(Common::SettingsNames::composerEncryptDefault, false).toBool());
+    m_composer->setDefaultKey(settings->value(Common::SettingsNames::composerDefaultKey).toString());
 }
 
 MessageComposer *Submission::composer()

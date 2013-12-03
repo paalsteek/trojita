@@ -678,6 +678,9 @@ target_link_libraries(Composer Common MSA Streams UiUtils qwwsmtpclient ${QT_QTG
 if(NOT WITH_QT5)
     target_link_libraries(Composer MimetypesQt4)
 endif()
+if(WITH_GNUPG)
+    target_link_libraries(Composer ${QCA2_LIBRARIES})
+endif()
 
 add_library(Imap STATIC ${libImap_SOURCES})
 set_property(TARGET Imap APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)

@@ -85,6 +85,9 @@ public:
     void setAttachmentName(const QModelIndex &index, const QString &newName);
 
     void setPreloadEnabled(const bool preload);
+    void setSignMessage(const bool sign);
+    void setEncryptMessage(const bool encrypt);
+    void setDefaultKey(const QString key);
 
 private:
     static QByteArray generateMessageId(const Imap::Message::MailAddress &sender);
@@ -92,10 +95,14 @@ private:
     static QByteArray generateMimeBoundary();
 
     void writeCommonMessageBeginning(QIODevice *target, const QByteArray boundary) const;
+    void writeCommonMessageBody(QIODevice *target, const QByteArray boundary) const;
     bool writeAttachmentHeader(QIODevice *target, QString *errorMessage, const AttachmentItem *attachment, const QByteArray &boundary) const;
     bool writeAttachmentBody(QIODevice *target, QString *errorMessage, const AttachmentItem *attachment) const;
 
     void writeHeaderWithMsgIds(QIODevice *target, const QByteArray &headerName, const QList<QByteArray> &messageIds) const;
+
+    bool signRawMessage(QIODevice *target, QByteArray &message) const;
+    bool encryptRawMessage(QIODevice *target, QByteArray &message) const;
 
     bool validateDropImapMessage(QDataStream &stream, QString &mailbox, uint &uidValidity, QList<uint> &uids) const;
     bool validateDropImapPart(QDataStream &stream, QString &mailbox, uint &uidValidity, uint &uid, QByteArray &trojitaPath) const;
@@ -116,6 +123,9 @@ private:
     QList<AttachmentItem *> m_attachments;
     QPointer<Imap::Mailbox::Model> m_model;
     bool m_shouldPreload;
+    bool m_shouldSign;
+    bool m_shouldEncrypt;
+    QString m_defaultKey;
 };
 
 }

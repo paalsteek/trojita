@@ -24,6 +24,7 @@
 
 #include <QPersistentModelIndex>
 #include <QPointer>
+#include <QSettings>
 
 #include "Recipients.h"
 
@@ -51,7 +52,7 @@ class Submission : public QObject
 {
     Q_OBJECT
 public:
-    explicit Submission(QObject *parent, Imap::Mailbox::Model *model, MSA::MSAFactory *msaFactory);
+    explicit Submission(QObject *parent, Imap::Mailbox::Model *model, MSA::MSAFactory *msaFactory, QSettings* settings);
     virtual ~Submission();
 
     MessageComposer *composer();

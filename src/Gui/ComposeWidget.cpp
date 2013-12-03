@@ -92,7 +92,7 @@ ComposeWidget::ComposeWidget(MainWindow *mainWindow, QSettings *settings, MSA::M
     setWindowIcon(winIcon);
 
     Q_ASSERT(m_mainWindow);
-    m_submission = new Composer::Submission(this, m_mainWindow->imapModel(), msaFactory);
+    m_submission = new Composer::Submission(this, m_mainWindow->imapModel(), msaFactory, settings);
     connect(m_submission, SIGNAL(succeeded()), this, SLOT(sent()));
     connect(m_submission, SIGNAL(failed(QString)), this, SLOT(gotError(QString)));
     connect(m_submission, SIGNAL(passwordRequested(QString,QString)), this, SLOT(passwordRequested(QString,QString)), Qt::QueuedConnection);
