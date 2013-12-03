@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CryptographyPage</class>
+ <widget class="QScrollArea" name="CryptographyPage">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>300</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>ScrollArea</string>
+  </property>
+  <property name="widgetResizable">
+   <bool>true</bool>
+  </property>
+  <widget class="QWidget" name="scrollAreaWidgetContents">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>398</width>
+     <height>298</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="1" column="0">
+     <widget class="QCheckBox" name="encryptDefaultCheckbox">
+      <property name="text">
+       <string>Encrypt outgoing mails by default</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0">
+     <widget class="QCheckBox" name="signDefaultCheckbox">
+      <property name="text">
+       <string>Sign outgoing mails by default</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <layout class="QHBoxLayout" name="defaultKeyLayout">
+      <item>
+       <widget class="QLabel" name="defaultKeyLabel">
+        <property name="text">
+         <string>Default Key:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="defaultKeyEdit"/>
+      </item>
+      <item>
+       <widget class="QPushButton" name="defaultKeyButton">
+        <property name="text">
+         <string>Select Key</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
