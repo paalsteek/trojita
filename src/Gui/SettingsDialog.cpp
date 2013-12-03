@@ -88,6 +88,9 @@ SettingsDialog::SettingsDialog(MainWindow *parent, Composer::SenderIdentitiesMod
     addPage(new ImapPage(this, *m_settings), tr("I&MAP"));
     addPage(new CachePage(this, *m_settings), tr("&Offline"));
     addPage(new OutgoingPage(this, *m_settings), tr("&SMTP"));
+#ifdef TROJITA_HAVE_GNUPG
+    addPage(new CryptographyPage(this, *m_settings), tr("&Cryptography"));
+#endif // TROJITA_HAVE_GNUPG
 #ifdef XTUPLE_CONNECT
     xtConnect = new XtConnectPage(this, *m_settings, imap);
     stack->addTab(xtConnect, tr("&xTuple"));
@@ -726,6 +729,75 @@ bool CachePage::passwordFailures(QString &message) const
 {
     Q_UNUSED(message);
     return false;
+}
+
+CryptographyPage::CryptographyPage(QWidget *parent, QSettings &s): QScrollArea(parent), Ui_CryptographyPage()
+{
+    Ui_CryptographyPage::setupUi(this);
+
+    using Common::SettingsNames;
+    signDefaultCheckbox->setChecked(s.value(SettingsNames::composerSignDefault).toBool());
+    encryptDefaultCheckbox->setChecked(s.value(SettingsNames::composerEncryptDefault).toBool());
+    QString defaultKey = s.value(SettingsNames::composerDefaultKey).toString();
+    if (!defaultKey.isEmpty())
+        defaultKeyEdit->setText(defaultKey);
+
+    connect(defaultKeyButton, SIGNAL(clicked()), this, SLOT(handleSelectDefaultKey()));
+}
+
+void CryptographyPage::resizeEvent(QResizeEvent *event)
+{
+    QScrollArea::resizeEvent(event);
+    scrollAreaWidgetContents->setMinimumSize(event->size());
+    scrollAreaWidgetContents->adjustSize();
+}
+
+void CryptographyPage::save(QSettings &s)
+{
+    using Common::SettingsNames;
+    s.setValue(SettingsNames::composerSignDefault, signDefaultCheckbox->isChecked());
+    s.setValue(SettingsNames::composerEncryptDefault, encryptDefaultCheckbox->isChecked());
+    s.setValue(SettingsNames::composerDefaultKey, defaultKeyEdit->text());
+}
+
+QWidget* CryptographyPage::asWidget()
+{
+    return this;
+}
+
+bool CryptographyPage::checkValidity() const
+{
+    return true; //TODO: add some validity checks here
+}
+
+void CryptographyPage::handleSelectDefaultKey()
+{
+    SelectOpenPGPKey *select = new SelectOpenPGPKey(this);
+    select->setWindowTitle(tr("Select Default Key"));
+    select->show();
+    connect(select, SIGNAL(keySelected(QString)), this, SLOT(handleKeySelected(QString)));
+}
+
+void CryptographyPage::handleKeySelected(QModelIndex keyIndex)
+{
+    //defaultKeyEdit->setText(key);
+}
+
+SelectOpenPGPKey::SelectOpenPGPKey(QWidget *parent)
+    : QDialog(parent), Ui_SelectOpenPGPKey()
+{
+    Ui_SelectOpenPGPKey::setupUi(this);
+
+    KeyListModel* model = new KeyListModel();
+
+    keyList->setModel(model);
+
+    connect(buttonBox, SIGNAL(accepted()), this, SLOT(handleAccepted()));
+}
+
+void SelectOpenPGPKey::handleAccepted()
+{
+    emit keySelected(keyList->currentIndex());
 }
 
 OutgoingPage::OutgoingPage(SettingsDialog *parent, QSettings &s): QScrollArea(parent), Ui_OutgoingPage(), m_parent(parent)

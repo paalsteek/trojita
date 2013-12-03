@@ -422,9 +422,14 @@ set(libDesktopGui_RESOURCES
 if(WITH_GNUPG)
   set(TROJITA_HAVE_GNUPG True)
   set(libDesktopGui_HEADERS ${libDesktopGui_HEADERS}
-    ${path_DesktopGui}/OpenPGPView.h)
+    ${path_DesktopGui}/OpenPGPView.h
+    ${path_DesktopGui}/KeyListModel.h)
   set(libDesktopGui_SOURCES ${libDesktopGui_SOURCES}
-    ${path_DesktopGui}/OpenPGPView.cpp)
+    ${path_DesktopGui}/OpenPGPView.cpp
+    ${path_DesktopGui}/KeyListModel.cpp)
+  set(libDesktopGui_UI ${libDesktopGui_UI}
+    ${path_DesktopGui}/SettingsCryptographyPage.ui
+    ${path_DesktopGui}/SelectOpenPGPKey.ui)
 else(WITH_GNUPG)
   set(TROJITA_HAVE_GNUPG False)
 endif(WITH_GNUPG)

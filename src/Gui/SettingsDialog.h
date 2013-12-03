@@ -23,6 +23,7 @@
 #ifndef SETTINGSDIALOG_H
 #define SETTINGSDIALOG_H
 
+#include "configure.cmake.h"
 #include <QDialog>
 #include <QPointer>
 #include <QSettings>
@@ -32,6 +33,11 @@
 #include "ui_SettingsImapPage.h"
 #include "ui_SettingsCachePage.h"
 #include "ui_SettingsOutgoingPage.h"
+#ifdef TROJITA_HAVE_GNUPG
+#include "ui_SettingsCryptographyPage.h"
+#include "ui_SelectOpenPGPKey.h"
+#include "KeyListModel.h"
+#endif // TROJITA_HAVE_GNUPG
 
 class QCheckBox;
 class QComboBox;
@@ -234,6 +240,48 @@ private:
 signals:
     void saved();
 };
+
+#ifdef TROJITA_HAVE_GNUPG
+class CryptographyPage : public QScrollArea, Ui_CryptographyPage, public ConfigurationWidgetInterface
+{
+    Q_OBJECT
+public:
+    CryptographyPage(QWidget *parent, QSettings &s);
+    virtual void save(QSettings &s);
+    virtual QWidget *asWidget();
+    virtual bool checkValidity() const;
+
+protected:
+    virtual void resizeEvent(QResizeEvent *event);
+
+private slots:
+    void handleSelectDefaultKey();
+    void handleKeySelected(QModelIndex keyIndex);
+
+private:
+    CryptographyPage(const CryptographyPage &); // don't implement
+    CryptographyPage &operator=(const CryptographyPage &); // don't implement
+};
+
+class SelectOpenPGPKey : public QDialog, Ui_SelectOpenPGPKey
+{
+    Q_OBJECT
+public:
+    SelectOpenPGPKey(QWidget *parent);
+
+signals:
+    void keySelected(QModelIndex);
+
+private slots:
+    void handleAccepted();
+
+private:
+    SelectOpenPGPKey(const SelectOpenPGPKey &); // don't implement
+    SelectOpenPGPKey &operator=(const SelectOpenPGPKey &); // don't implement
+
+};
+
+#endif // TROJITA_HAVE_GNUPG
 
 #ifdef XTUPLE_CONNECT
 class SettingsDialog;
