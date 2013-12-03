@@ -4,6 +4,7 @@
 #include "mimetic/mimetic.h"
 
 #include "../Encoders.h"
+#include "../Model/MailboxTreeFwd.h"
 
 namespace Imap {
 
@@ -14,7 +15,7 @@ MimeParser::MimeParser()
 void MimeParser::parseMessage(QByteArray message, Mailbox::TreeItemPart *parent)
 {
     mimetic::MimeEntity me(message.begin(), message.end());
-    QList<Mailbox::TreeItem *> items;
+    Mailbox::TreeItemChildrenList items;
     items.append(createTreeItems(&me, parent));
     parent->setChildren(items); //TODO: delete any existing children
 }
@@ -47,7 +48,7 @@ Mailbox::TreeItem *MimeParser::createTreeItems(mimetic::MimeEntity *pMe, Mailbox
     if ( h.contentType().isMultipart() )
     {
         mimetic::MimeEntityList& parts = pMe->body().parts();
-        QList<Mailbox::TreeItem *> items;
+        Mailbox::TreeItemChildrenList items;
         for (mimetic::MimeEntityList::iterator mbit = parts.begin(); mbit != parts.end(); ++mbit)
         {
             items.append(createTreeItems(*mbit, part));
@@ -59,7 +60,7 @@ Mailbox::TreeItem *MimeParser::createTreeItems(mimetic::MimeEntity *pMe, Mailbox
         part->m_rawData = QString::fromStdString(s.str()).toLatin1();
         decodeTransportEncoding(QString::fromStdString(s.str()).toLatin1(), part->encoding(), part->dataPtr());
     }
-    part->m_fetchStatus = Mailbox::TreeItem::DONE;
+    part->setFetchStatus(Mailbox::TreeItem::DONE);
     return part;
 }
 

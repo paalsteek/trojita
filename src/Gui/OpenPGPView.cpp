@@ -72,7 +72,7 @@ void OpenPGPView::startVerification()
         layout->addWidget(m_factory->create(anotherPart, m_recursionDepth + 1, PartWidgetFactory::filteredForEmbedding(m_options)));
 
         //Trigger lazy loading of the required message parts
-        m_partIndex.child(0,0).data(Imap::Mailbox::RolePartData);
+        m_partIndex.child(0,0).child(0,Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS).data(Imap::Mailbox::RolePartData);
         m_partIndex.child(0,0).child(0,Imap::Mailbox::TreeItem::OFFSET_MIME).data(Imap::Mailbox::RolePartData);
         m_partIndex.child(1,0).data(Imap::Mailbox::RolePartData);
 
@@ -131,9 +131,10 @@ void OpenPGPView::handleDataChangedForVerification(const QModelIndex &topLeft, c
     Q_UNUSED(bottomRight)
 
     qDebug() << "handleDataChanged";
-    if ( m_partIndex.child(0,0).data(Imap::Mailbox::RoleIsFetched).toBool() &&
+    if ( m_partIndex.child(0,0).child(0,Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS).data(Imap::Mailbox::RoleIsFetched).toBool() &&
          m_partIndex.child(0,0).child(0,Imap::Mailbox::TreeItem::OFFSET_MIME).data(Imap::Mailbox::RoleIsFetched).toBool() &&
-         m_partIndex.child(1,0).data(Imap::Mailbox::RoleIsFetched).toBool() )
+         m_partIndex.child(1,0).data(Imap::Mailbox::RoleIsFetched).toBool())
+
     {
         qDebug() << "data fetched";
         disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForVerification(QModelIndex,QModelIndex)));
@@ -225,15 +226,16 @@ void OpenPGPView::slotDisplayVerificationResult()
     pgpFrame->setFrameStyle(QFrame::StyledPanel | QFrame::Raised);
     //TODO: set background color depending on result
 
-    if (!m_msg->success())
+    if (!m_msg->success() || !m_msg->verifySuccess())
     {
         lbl->setText(tr("Signature verification failed. %1").arg(strerror(m_msg->errorCode())));
+        pgpFrame->setStyleSheet("background-color: rgba(200, 0, 0, 50%);");
         qDebug() << "failed: " << m_msg->diagnosticText();
     } else {
         QString signer;
         QCA::KeyStoreManager manager;
         QCA::KeyStoreManager::start();
-        manager.waitForBusyFinished();
+        manager.waitForBusyFinished(); //TODO: synchronous wait?
         QCA::KeyStore store("qca-gnupg", &manager);
         QCA::PGPKey key = m_msg->signer().key().pgpPublicKey();
         Q_FOREACH(QCA::KeyStoreEntry entry, store.entryList())
@@ -247,6 +249,9 @@ void OpenPGPView::slotDisplayVerificationResult()
             }
         }
         lbl->setText(tr("Signature with key \"%1\" (%2) successfully verified.").arg(signer, key.keyId()));
+        lbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        pgpFrame->setStyleSheet("background-color: rgba(0, 150, 0, 50%);");
+        qDebug() << "success: " << m_msg->diagnosticText();
     }
     QVBoxLayout *l = new QVBoxLayout();
     l->addWidget(lbl);
