@@ -36,7 +36,8 @@ struct SettingsNames {
            imapPortKey, imapStartTlsKey, imapUserKey, imapProcessKey,
            imapStartOffline, imapEnableId, obsImapSslPemCertificate, imapSslPemPubKey,
            imapBlacklistedCapabilities, imapUseSystemProxy, imapNeedsNetwork;
-    static const QString composerSaveToImapKey, composerImapSentKey, smtpUseBurlKey;
+    static const QString composerSaveToImapKey, composerImapSentKey, smtpUseBurlKey,
+		       composerDefaultKey, composerEncryptDefault, composerSignDefault;
     static const QString cacheMetadataKey, cacheMetadataMemory,
            cacheOfflineKey, cacheOfflineNone, cacheOfflineXDays, cacheOfflineAll, cacheOfflineNumberDaysKey;
     static const QString xtConnectCacheDirectory, xtSyncMailboxList, xtDbHost, xtDbPort,
