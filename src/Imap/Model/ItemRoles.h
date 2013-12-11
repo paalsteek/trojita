@@ -129,8 +129,6 @@ enum {
 
     /** @short Contents of a message part */
     RolePartData,
-    /** @short Raw Contents of a message part */
-    RolePartRawData,
     /** @short MIME type of a message part */
     RolePartMimeType,
     /** @short Charset of a message part */

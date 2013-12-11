@@ -206,7 +206,7 @@ void OpenPGPView::verify(const QModelIndex &textIndex, const QModelIndex &sigInd
     Q_ASSERT(mimePart.isValid());
 
     QByteArray rawsigned_text = mimePart.data(Imap::Mailbox::RolePartData).toByteArray();
-    rawsigned_text += textIndex.data(Imap::Mailbox::RolePartRawData).toByteArray();
+    rawsigned_text += textIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS).data(Imap::Mailbox::RolePartData).toByteArray();
 
     qDebug() << rawsigned_text.data();
     qDebug() << sigIndex.data(Imap::Mailbox::RolePartData).toByteArray();

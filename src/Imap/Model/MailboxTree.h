@@ -309,7 +309,6 @@ class TreeItemPart: public TreeItem
     QByteArray m_protocol;
     QByteArray m_encoding;
     QByteArray m_data;
-    QByteArray m_rawData;
     QByteArray m_bodyFldId;
     QByteArray m_bodyDisposition;
     QString m_fileName;

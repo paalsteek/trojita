@@ -57,7 +57,7 @@ Mailbox::TreeItem *MimeParser::createTreeItems(mimetic::MimeEntity *pMe, Mailbox
     } else {
         std::stringstream s;
         s << pMe->body();
-        part->m_rawData = QString::fromStdString(s.str()).toLatin1();
+        part->m_partRaw->m_data = QString::fromStdString(s.str()).toLatin1();
         decodeContentTransferEncoding(QString::fromStdString(s.str()).toLatin1(), part->encoding(), part->dataPtr());
     }
     part->setFetchStatus(Mailbox::TreeItem::DONE);
