@@ -28,6 +28,7 @@
 
 #include "configure.cmake.h"
 #include "MessageView.h"
+#include "SimplePartWidget.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 #include "Imap/Model/Model.h"
@@ -36,10 +37,9 @@
 namespace Gui
 {
 
-OpenPGPView::OpenPGPView(QWidget *parent, PartWidgetFactory* factory, const QModelIndex &partIndex, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options)
-    : QGroupBox(parent), m_model(0), m_partIndex(partIndex), m_factory(factory), m_recursionDepth(recursionDepth), m_options(options)
+OpenPGPView::OpenPGPView(QWidget *parent, PartWidgetFactory* factory, Imap::Network::MsgPartNetAccessManager *manager, const QModelIndex &partIndex, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options)
+    : QGroupBox(parent), m_model(0), m_partIndex(partIndex), m_factory(factory), m_manager(manager), m_recursionDepth(recursionDepth), m_options(options)
 {
-    setFlat(true);
     using namespace Imap::Mailbox;
 }
 
@@ -56,9 +56,8 @@ void OpenPGPView::startVerification()
     } else if (childrenCount != 2) {
         QLabel *lbl = new QLabel(tr("Malformed multipart/signed message: %1 nested parts").arg(QString::number(childrenCount)), this);
         layout->addWidget(lbl); //TODO: show those parts here?
-        return;
     } else {
-        setTitle(tr("OpenPGP signed message"));
+        setTitle(tr("OpenPGP mime signed message"));
         Q_ASSERT(childrenCount == 2); // from the if logic; FIXME: refactor
 
         m_pgp = new QCA::OpenPGP();
@@ -114,6 +113,42 @@ void OpenPGPView::startDecryption()
     }
 }
 
+void OpenPGPView::startInlineVerification()
+{
+    QVBoxLayout *layout = new QVBoxLayout(this);
+    layout->setSpacing(0);
+    setTitle(tr("OpenPGP inline signed message"));
+
+    m_pgp = new QCA::OpenPGP();
+    m_msg = new QCA::SecureMessage(m_pgp);
+    Imap::Mailbox::Model::realTreeItem(m_partIndex, &m_model);
+    Q_ASSERT(m_model);
+    connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForInlineVerification(QModelIndex,QModelIndex)));
+
+    layout->addWidget(new SimplePartWidget(this, m_manager, m_partIndex, m_factory->messageView()));
+
+    m_partIndex.data(Imap::Mailbox::RolePartData);
+
+    handleDataChangedForInlineVerification(QModelIndex(),QModelIndex());
+}
+
+void OpenPGPView::startInlineDecryption()
+{
+    QVBoxLayout *layout = new QVBoxLayout(this);
+    layout->setSpacing(0);
+    setTitle(tr("OpenPGP inline encrypted message"));
+
+    m_pgp = new QCA::OpenPGP();
+    m_msg = new QCA::SecureMessage(m_pgp);
+    Imap::Mailbox::Model::realTreeItem(m_partIndex, &m_model);
+    Q_ASSERT(m_model);
+    connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForInlineDecryption(QModelIndex,QModelIndex)));
+
+    m_partIndex.data(Imap::Mailbox::RolePartData);
+
+    handleDataChangedForInlineDecryption(QModelIndex(),QModelIndex());
+}
+
 QString OpenPGPView::quoteMe() const
 {
     QStringList res;
@@ -144,6 +179,23 @@ void OpenPGPView::handleDataChangedForVerification(const QModelIndex &topLeft, c
 
 }
 
+void OpenPGPView::handleDataChangedForInlineVerification(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+{
+    Q_UNUSED(topLeft)
+    Q_UNUSED(bottomRight)
+
+    qDebug() << "handleDataChanged";
+
+    if ( m_partIndex.data(Imap::Mailbox::RoleIsFetched).toBool() )
+
+    {
+        qDebug() << "data fetched";
+        disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForInlineVerification(QModelIndex,QModelIndex)));
+
+        verify(m_partIndex);
+    }
+}
+
 void OpenPGPView::handleDataChangedForDecryption(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
     Q_UNUSED(topLeft)
@@ -157,6 +209,24 @@ void OpenPGPView::handleDataChangedForDecryption(const QModelIndex &topLeft, con
         disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForDecryption(QModelIndex,QModelIndex)));
 
         decrypt(m_partIndex.child(0,0), m_partIndex.child(1,0));
+    }
+
+}
+
+void OpenPGPView::handleDataChangedForInlineDecryption(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+{
+    Q_UNUSED(topLeft)
+    Q_UNUSED(bottomRight)
+
+    qDebug() << "handleDataChanged";
+
+    if ( m_partIndex.data(Imap::Mailbox::RoleIsFetched).toBool() )
+
+    {
+        qDebug() << "data fetched";
+        disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChangedForInlineDecryption(QModelIndex,QModelIndex)));
+
+        decrypt(m_partIndex);
     }
 
 }
@@ -219,6 +289,20 @@ void OpenPGPView::verify(const QModelIndex &textIndex, const QModelIndex &sigInd
     m_msg->end();
 }
 
+void OpenPGPView::verify(const QModelIndex &textIndex)
+{
+    QByteArray rawsigned_text = textIndex.data(Imap::Mailbox::RolePartData).toByteArray();
+
+    qDebug() << rawsigned_text.data();
+
+    connect(m_msg, SIGNAL(finished()), this, SLOT(slotDisplayVerificationResult()));
+
+    m_msg->setFormat(QCA::SecureMessage::Ascii);
+    m_msg->startVerify();
+    m_msg->update(rawsigned_text.data());
+    m_msg->end();
+}
+
 void OpenPGPView::slotDisplayVerificationResult()
 {
     QLabel *lbl = new QLabel((QWidget*) parent());
@@ -267,6 +351,16 @@ void OpenPGPView::decrypt(const QModelIndex &versionIndex, const QModelIndex &en
         return;
     }
 
+    connect(m_msg, SIGNAL(finished()), this, SLOT(slotDisplayDecryptionResult()));
+
+    m_msg->setFormat(QCA::SecureMessage::Ascii);
+    m_msg->startDecrypt();
+    m_msg->update(encIndex.data(Imap::Mailbox::RolePartData).toByteArray().data());
+    m_msg->end();
+}
+
+void OpenPGPView::decrypt(const QModelIndex &encIndex)
+{
     connect(m_msg, SIGNAL(finished()), this, SLOT(slotDisplayDecryptionResult()));
 
     m_msg->setFormat(QCA::SecureMessage::Ascii);

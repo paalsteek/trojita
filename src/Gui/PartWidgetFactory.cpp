@@ -156,7 +156,7 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
         } else if (mimeType == QLatin1String("multipart/signed")) {
 #ifdef TROJITA_HAVE_GNUPG
             if (partIndex.data(RolePartProtocol).toString() == QLatin1String("application/pgp-signature")) {
-                OpenPGPView *v = new OpenPGPView(0, this, partIndex, recursionDepth, loadingMode);
+                OpenPGPView *v = new OpenPGPView(0, this, manager, partIndex, recursionDepth, loadingMode);
                 v->startVerification();
                 return v;
             } else
@@ -165,7 +165,7 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
         } else if (mimeType == QLatin1String("multipart/encrypted")) {
 #ifdef TROJITA_HAVE_GNUPG
             if (partIndex.data(RolePartProtocol).toString() == QLatin1String("application/pgp-encrypted")) {
-                OpenPGPView *v = new OpenPGPView(0, this, partIndex, recursionDepth, loadingMode);
+                OpenPGPView *v = new OpenPGPView(0, this, manager, partIndex, recursionDepth, loadingMode);
                 v->startDecryption();
                 return v;
             } else
@@ -228,8 +228,22 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
                 partIndex.data(Imap::Mailbox::RoleIsFetched).toBool() ||
                 (m_netWatcher && m_netWatcher->desiredNetworkPolicy() != Imap::Mailbox::NETWORK_EXPENSIVE ) ||
                 partIndex.data(Imap::Mailbox::RolePartOctets).toInt() < ExpensiveFetchThreshold) {
-            // Show it directly without any fancy wrapping
-            return new SimplePartWidget(0, manager, partIndex, m_messageView);
+#ifdef TROJITA_HAVE_GNUPG
+            if (mimeType == QLatin1String("text/plain") && partIndex.data(RolePartData).toString().contains(QLatin1String("-----BEGIN PGP SIGNED MESSAGE-----"))) {
+                //Inline PGP signed message
+                OpenPGPView *v = new OpenPGPView(0, this, manager, partIndex, recursionDepth, loadingMode);
+                v->startInlineVerification();
+                return v;
+            } else if (mimeType == QLatin1String("text/plain") && partIndex.data(RolePartData).toString().contains(QLatin1String("-----BEGIN PGP MESSAGE-----"))) {
+                //Inline PGP encrypted message
+                OpenPGPView *v = new OpenPGPView(0, this, manager, partIndex, recursionDepth, loadingMode);
+                v->startInlineDecryption();
+                return v;
+            } else {
+#endif //TROJITA_HAVE_GNUPG
+                // Show it directly without any fancy wrapping
+                return new SimplePartWidget(0, manager, partIndex, m_messageView);
+            }
         } else {
             return new LoadablePartWidget(0, manager, partIndex, m_messageView, this, recursionDepth + 1,
                                           (m_netWatcher && m_netWatcher->effectiveNetworkPolicy() != Imap::Mailbox::NETWORK_OFFLINE) ?

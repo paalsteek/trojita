@@ -50,25 +50,32 @@ class OpenPGPView : public QGroupBox, public AbstractPartWidget
     Q_OBJECT
 
 public:
-    OpenPGPView(QWidget *parent, PartWidgetFactory *factory, const QModelIndex &partIndex, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
+    OpenPGPView(QWidget *parent, PartWidgetFactory *factory, Imap::Network::MsgPartNetAccessManager *manager, const QModelIndex &partIndex, const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
     virtual QString quoteMe() const;
     virtual void reloadContents();
     void startVerification();
     void startDecryption();
+    void startInlineVerification();
+    void startInlineDecryption();
 
 private slots:
     void handleDataChangedForVerification(const QModelIndex &topLeft, const QModelIndex &bottomDown);
     void handleDataChangedForDecryption(const QModelIndex &topLeft, const QModelIndex &bottomDown);
+    void handleDataChangedForInlineVerification(const QModelIndex &topLeft, const QModelIndex &bottomDown);
+    void handleDataChangedForInlineDecryption(const QModelIndex &topLeft, const QModelIndex &bottomDown);
     void slotDisplayVerificationResult();
     void slotDisplayDecryptionResult();
 
 private:
     void verify(const QModelIndex &textIndex, const QModelIndex &sigIndex);
+    void verify(const QModelIndex &textIndex);
     void decrypt(const QModelIndex &versionIndex, const QModelIndex &encIndex);
+    void decrypt(const QModelIndex &encIndex);
     QString strerror(QCA::SecureMessage::Error error);
     const Imap::Mailbox::Model *m_model;
     QPersistentModelIndex m_partIndex;
     PartWidgetFactory *m_factory;
+    Imap::Network::MsgPartNetAccessManager *m_manager;
     const int m_recursionDepth;
     PartWidgetFactory::PartLoadingOptions m_options;
     QCA::SecureMessage *m_msg;
