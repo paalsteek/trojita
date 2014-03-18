@@ -307,13 +307,10 @@ void OpenPGPView::slotDisplayDecryptionResult() // TODO: refactor this to be abl
         setContentsMargins(0, 0, 0, 0);
         // multipart/mixed or anything else, as mandated by RFC 2046, Section 5.1.3
         layout->setSpacing(0);
-        for (int i = 0; i < decryptedPart.model()->rowCount(decryptedPart); ++i) {
-            using namespace Imap::Mailbox;
-            QModelIndex anotherPart = decryptedPart.child(i, 0);
+            QModelIndex anotherPart = decryptedPart.child(0, 0);
             Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
             QWidget *res = m_factory->create(anotherPart, m_recursionDepth + 1, PartWidgetFactory::filteredForEmbedding(m_options) ); //TODO: pass options to here
             layout->addWidget(res);
-        }
 #endif // TROJITA_HAVE_MIMETIC
     }
     this->layout()->addWidget(pgpFrame);
