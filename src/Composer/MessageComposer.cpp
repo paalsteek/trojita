@@ -734,25 +734,60 @@ bool MessageComposer::encryptRawMessage(QIODevice *target, QByteArray &message) 
     manager.waitForBusyFinished(); //TODO: synchronous wait?
     QCA::KeyStore store("qca-gnupg", &manager);
 
-    QCA::SecureMessageKeyList keys;
+    //QCA::SecureMessageKeyList keys;
+    //Recipient, keyfound, key
+    QMap<int, QCA::SecureMessageKey> keyMap;
+    QCA::SecureMessageKey defaultKey;
+
+    //TODO: add option to always encrypt for sender
 
     Q_FOREACH(QCA::KeyStoreEntry entry, store.entryList())
     {
-        // TODO: select the encryption key based on the receipient address, also support multiple keys and allow encrypting with the senders key too
-        if (entry.id() == m_defaultKey)
+        if (!entry.pgpPublicKey().isNull())
         {
-            if (!entry.pgpPublicKey().isNull())
+            Q_FOREACH(auto recipient, m_recipients)
             {
-                QCA::SecureMessageKey key;
-                key.setPGPPublicKey(entry.pgpPublicKey());
-                keys.append(key);
+                int i = m_recipients.indexOf(recipient);
+                QCA::PGPKey pubKey = entry.pgpPublicKey();
+                if (pubKey.userIds().filter(recipient.second.asSMTPMailbox()).length() > 0) //TODO: QStringList::filter?
+                {
+                    qDebug() << "Public key user IDs:" << pubKey.userIds();
+                    QCA::SecureMessageKey key;
+                    key.setPGPPublicKey(entry.pgpPublicKey());
+                    keyMap[i] = key;
+                    continue;
+                }
+            }
+
+            if (entry.id() == m_defaultKey)
+            {
+                defaultKey.setPGPPublicKey(entry.pgpPublicKey());
             }
         }
     }
-    // TODO: check whether all needed keys where found
+
+    // check whether all needed keys where found
+    for(int id = 0; id < m_recipients.length(); id++)
+    {
+        if (keyMap[id].pgpPublicKey().isNull())
+        {
+            qDebug() << "No valid key for" << m_recipients[id].second.asPrettyString() << "found";
+            qDebug() << "Not all public keys found. Aborting!";
+            //TODO: add some way of user interaction
+            return false;
+        }
+    }
+
+    if (defaultKey.pgpPublicKey().isNull())
+    {
+        qDebug() << "Default key not found!";
+        return false;
+    }
 
     QCA::OpenPGP *pgp = new QCA::OpenPGP();
     QCA::SecureMessage msg(pgp);
+    QCA::SecureMessageKeyList keys = keyMap.values();
+    keys.append(defaultKey);
     msg.setRecipients(keys); //TODO: change to list of keys
     msg.setFormat(QCA::SecureMessage::Ascii);
     msg.startEncrypt();
