@@ -44,6 +44,7 @@ Mailbox::TreeItem *MimeParser::createTreeItems(mimetic::MimeEntity *pMe, Mailbox
     mimetic::Header &h = pMe->header();
     qDebug() << "new message part found:" << QString::fromStdString(h.contentType().str());
     Mailbox::TreeItemPart *part = new Mailbox::TreeItemPart(parent, QString::fromStdString(h.contentType().type() + "/" + h.contentType().subtype()));
+    part->setFetchStatus(Mailbox::TreeItem::LOADING);
     storeInterestingFields(part, &h);
     if ( h.contentType().isMultipart() )
     {
@@ -57,8 +58,12 @@ Mailbox::TreeItem *MimeParser::createTreeItems(mimetic::MimeEntity *pMe, Mailbox
     } else {
         std::stringstream s;
         s << pMe->body();
-        part->m_partRaw->m_data = QString::fromStdString(s.str()).toLatin1();
-        decodeContentTransferEncoding(QString::fromStdString(s.str()).toLatin1(), part->encoding(), part->dataPtr());
+        QByteArray rawData = QString::fromStdString(s.str()).toLatin1();
+        Mailbox::TreeItemPart* rawPart = dynamic_cast<Mailbox::TreeItemPart*>(part->specialColumnPtr(0, Mailbox::TreeItem::OFFSET_RAW_CONTENTS));
+        rawPart->m_data = rawData;
+        rawPart->setFetchStatus(Mailbox::TreeItemPart::DONE);
+        decodeContentTransferEncoding(rawData, part->encoding(), part->dataPtr());
+        qDebug() << "part decoded:" << *(part->dataPtr());
     }
     part->setFetchStatus(Mailbox::TreeItem::DONE);
     return part;
