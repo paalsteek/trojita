@@ -9,14 +9,23 @@
 #  QCA2_GNUPG_LIBRARIES - The libraries needed for GnuPG support of QCA2
 
 find_package(PkgConfig)
-pkg_check_modules(PC_QCA2 QUIET qca2)
+if (WITH_QT5)
+	pkg_check_modules(PC_QCA2 QUIET qca2-qt5)
+else ()
+	pkg_check_modules(PC_QCA2 QUIET qca2)
+endif ()
 set(QCA2_DEFINITIONS ${PC_QCA2_CFLAGS_OTHER})
 
 find_path(QCA2_INCLUDE_DIR qca.h
           HINTS ${PC_QCA2_INCLUDEDIR} ${PC_QCA2_INCLUDE_DIRS})
 
-find_library(QCA2_LIBRARY NAMES qca libqca
-             HINTS ${PC_QCA2_LIBDIR} ${PC_QCA2_LIBRARY_DIRS} )
+if (WITH_QT5)
+	find_library(QCA2_LIBRARY NAMES qca-qt5 libqca-qt5
+		     HINTS ${PC_QCA2_LIBDIR} ${PC_QCA2_LIBRARY_DIRS} )
+else ()
+	find_library(QCA2_LIBRARY NAMES qca libqca
+		     HINTS ${PC_QCA2_LIBDIR} ${PC_QCA2_LIBRARY_DIRS} )
+endif ()
 
 #find_library(QCA2_GNUPG_LIBRARY NAMES qca-gnupg libqca-gnupg
 #             HINTS ${PC_QCA2_LIBDIR} ${PC_QCA2_LIBRARY_DIRS} )
