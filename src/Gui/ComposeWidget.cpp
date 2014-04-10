@@ -156,6 +156,21 @@ ComposeWidget::ComposeWidget(MainWindow *mainWindow, QSettings *settings, MSA::M
     ui->buttonBox->addButton(m_markButton, QDialogButtonBox::ResetRole);
     m_markButton->hide();
 
+    m_signButton = new QToolButton(ui->buttonBox);
+    m_signButton->setText(QLatin1String("Sign"));
+    m_signButton->setIcon(Gui::loadIcon("mail-sign"));
+    m_signButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_signButton->setCheckable(true);
+    m_signButton->setChecked(m_settings->value(Common::SettingsNames::composerSignDefault, false).toBool());
+    m_encButton = new QToolButton(ui->buttonBox);
+    m_encButton->setText(QLatin1String("Encrypt"));
+    m_encButton->setIcon(Gui::loadIcon("mail-encrypt"));
+    m_encButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_encButton->setCheckable(true);
+    m_encButton->setChecked(m_settings->value(Common::SettingsNames::composerEncryptDefault, false).toBool());
+    ui->buttonBox->addButton(m_signButton, QDialogButtonBox::ResetRole);
+    ui->buttonBox->addButton(m_encButton, QDialogButtonBox::ResetRole);
+
     ui->mailText->setFont(Gui::Util::systemMonospaceFont());
 
     connect(ui->mailText, SIGNAL(urlsAdded(QList<QUrl>)), SLOT(slotAttachFiles(QList<QUrl>)));
@@ -366,6 +381,17 @@ bool ComposeWidget::buildMessageData()
         m_submission->composer()->setInReplyTo(QList<QByteArray>());
         m_submission->composer()->setReferences(QList<QByteArray>());
         m_submission->composer()->setReplyingToMessage(QModelIndex());
+    }
+
+    if (m_signButton->isChecked()) {
+        m_submission->composer()->setSignMessage(true);
+    } else {
+        m_submission->composer()->setSignMessage(false);
+    }
+    if (m_encButton->isChecked()) {
+        m_submission->composer()->setEncryptMessage(true);
+    } else {
+        m_submission->composer()->setEncryptMessage(false);
     }
 
     return m_submission->composer()->isReadyForSerialization();

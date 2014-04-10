@@ -79,8 +79,6 @@ Submission::Submission(QObject *parent, Imap::Mailbox::Model *model, MSA::MSAFac
 {
     m_composer = new Composer::MessageComposer(model, this);
     m_composer->setPreloadEnabled(shouldBuildMessageLocally());
-    m_composer->setSignMessage(settings->value(Common::SettingsNames::composerSignDefault, false).toBool());
-    m_composer->setEncryptMessage(settings->value(Common::SettingsNames::composerEncryptDefault, false).toBool());
     m_composer->setDefaultKey(settings->value(Common::SettingsNames::composerDefaultKey).toString());
 }
 

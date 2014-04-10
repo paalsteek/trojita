@@ -135,6 +135,8 @@ private:
     QPushButton *sendButton;
     QPushButton *cancelButton;
     QToolButton *m_markButton;
+    QToolButton *m_encButton;
+    QToolButton *m_signButton;
     QActionGroup *m_markAsReply;
     QAction *m_actionStandalone;
     QAction *m_actionInReplyTo;
