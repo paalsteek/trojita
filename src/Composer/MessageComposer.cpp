@@ -666,7 +666,7 @@ bool MessageComposer::writeAttachmentBody(QIODevice *target, QString *errorMessa
     return true;
 }
 
-bool MessageComposer::signRawMessage(QIODevice *target, QByteArray &message) const
+bool MessageComposer::signRawMessage(QIODevice *target, QString *errorMessage, QByteArray &message) const
 {
     // The OpenPGP standard requires the signed message to end with <CR><LF> according to RFC3156
     if (!message.endsWith("\r\n"))
@@ -691,8 +691,10 @@ bool MessageComposer::signRawMessage(QIODevice *target, QByteArray &message) con
                 key.setPGPSecretKey(entry.pgpSecretKey());
         }
     }
-    if ( !key.havePrivate() )
+    if ( !key.havePrivate() ) {
+        *errorMessage = tr("Private key for signing not found");
         return false;
+    }
 
     qDebug() << "Signing:" << message;
 
@@ -706,7 +708,8 @@ bool MessageComposer::signRawMessage(QIODevice *target, QByteArray &message) con
     msg.waitForFinished();
     if (!msg.success())
     {
-        qDebug() << "Unable to sign message:" << msg.diagnosticText();
+        *errorMessage = tr("Unable to sign message");
+        qDebug() << errorMessage << ":" << msg.diagnosticText();
         return false;
     }
     QByteArray sigBoundary(generateMimeBoundary());
@@ -726,7 +729,7 @@ bool MessageComposer::signRawMessage(QIODevice *target, QByteArray &message) con
     return true;
 }
 
-bool MessageComposer::encryptRawMessage(QIODevice *target, QByteArray &message) const
+bool MessageComposer::encryptRawMessage(QIODevice *target, QString* errorMessage, QByteArray &message) const
 {
     //TODO: asynchronous wait for msg
     QCA::KeyStoreManager manager;
@@ -771,7 +774,8 @@ bool MessageComposer::encryptRawMessage(QIODevice *target, QByteArray &message) 
     {
         if (keyMap[id].pgpPublicKey().isNull())
         {
-            qDebug() << "No valid key for" << m_recipients[id].second.asPrettyString() << "found";
+            *errorMessage = tr("No valid key for %1 found").arg(m_recipients[id].second.asPrettyString());
+            qDebug() << errorMessage;
             qDebug() << "Not all public keys found. Aborting!";
             //TODO: add some way of user interaction
             return false;
@@ -780,7 +784,8 @@ bool MessageComposer::encryptRawMessage(QIODevice *target, QByteArray &message) 
 
     if (defaultKey.pgpPublicKey().isNull())
     {
-        qDebug() << "Default key not found!";
+        *errorMessage = tr("Default key not found!");
+        qDebug() << errorMessage;
         return false;
     }
 
@@ -797,7 +802,8 @@ bool MessageComposer::encryptRawMessage(QIODevice *target, QByteArray &message) 
     msg.waitForFinished(); //TODO: synchronous wait?
     if (!msg.success())
     {
-        qDebug() << "Unable to encrypt message:" << msg.diagnosticText();
+        *errorMessage = tr("Unable to encrypt message");
+        qDebug() << errorMessage << ":" << msg.diagnosticText();
         return false;
     }
     QByteArray encBoundary(generateMimeBoundary());
@@ -850,7 +856,7 @@ bool MessageComposer::asRawMessage(QIODevice *target, QString *errorMessage) con
         //buf.setBuffer(&signedMessage);
         QBuffer sbuf(&signedMessage);
         sbuf.open(QIODevice::WriteOnly);
-        if (!signRawMessage(&sbuf, rawMessage))
+        if (!signRawMessage(&sbuf, errorMessage, rawMessage))
             return false;
 
         sbuf.close();
@@ -864,7 +870,7 @@ bool MessageComposer::asRawMessage(QIODevice *target, QString *errorMessage) con
         //buf.setBuffer(&encryptedMessage);
         QBuffer sbuf(&encryptedMessage);
         sbuf.open(QIODevice::WriteOnly);
-        if (!encryptRawMessage(&sbuf, rawMessage))
+        if (!encryptRawMessage(&sbuf, errorMessage, rawMessage))
             return false;
 
         sbuf.close();

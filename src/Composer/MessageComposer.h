@@ -101,8 +101,8 @@ private:
 
     void writeHeaderWithMsgIds(QIODevice *target, const QByteArray &headerName, const QList<QByteArray> &messageIds) const;
 
-    bool signRawMessage(QIODevice *target, QByteArray &message) const;
-    bool encryptRawMessage(QIODevice *target, QByteArray &message) const;
+    bool signRawMessage(QIODevice *target, QString *errorMessage, QByteArray &message) const;
+    bool encryptRawMessage(QIODevice *target, QString *errorMessage, QByteArray &message) const;
 
     bool validateDropImapMessage(QDataStream &stream, QString &mailbox, uint &uidValidity, QList<uint> &uids) const;
     bool validateDropImapPart(QDataStream &stream, QString &mailbox, uint &uidValidity, uint &uid, QByteArray &trojitaPath) const;
