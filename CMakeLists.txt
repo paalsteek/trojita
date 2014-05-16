@@ -49,6 +49,8 @@ trojita_option(WITH_ZLIB "Build with zlib library" AUTO)
 trojita_option(WITH_SHARED_PLUGINS "Enable shared dynamic plugins" ON)
 trojita_option(WITH_TESTS "Build tests" ON "NOT WITH_HARMATTAN")
 trojita_option(DEV_FATAL_WARNINGS "Turn build warnings into errors (developers only)" OFF)
+trojita_option(WITH_MIMETIC "Build with MIME parser" AUTO)
+trojita_option(WITH_QCA "Build with Qt Cryptographic Architecture" AUTO "WITH_MIMETIC")
 
 if(WIN32)
     trojita_option(WITH_NSIS "Build Windows NSIS installer" AUTO)
@@ -104,6 +106,9 @@ else()
 endif()
 
 trojita_find_package(Git "" "" "" "")
+
+trojita_find_package(QCA2 "" "" "Qt Cryptographic Architecture" "" WITH_QCA)
+trojita_find_package(Mimetic "" "" "" "" WITH_MIMETIC)
 
 if(WIN32)
     trojita_find_package(MakeNSIS "" "http://nsis.sourceforge.net" "Nullsoft Scriptable Install System" "Needed for building Windows installer" WITH_NSIS)
@@ -230,6 +235,18 @@ if(NOT ZLIB_FOUND)
     trojita_find_package(ZLIB "" "" "" "" WITH_ZLIB)
 endif()
 
+if(WITH_QCA)
+  set(TROJITA_HAVE_QCA True)
+else()
+  set(TROJITA_HAVE_QCA False)
+endif()
+
+if(WITH_MIMETIC)
+    set(TROJITA_HAVE_MIMETIC True)
+else()
+    set(TROJITA_HAVE_MIMETIC False)
+endif()
+
 if(WITH_ZLIB)
     set(TROJITA_HAVE_ZLIB True)
     message(STATUS "Support for COMPRESS=DEFLATE enabled")
@@ -250,6 +267,7 @@ set(libCommon_SOURCES
     ${path_Common}/DeleteAfter.cpp
     ${path_Common}/FileLogger.cpp
     ${path_Common}/MetaTypes.cpp
+    ${path_Common}/ProxyModel.cpp
     ${path_Common}/Paths.cpp
     ${path_Common}/SettingsNames.cpp
 )
@@ -298,6 +316,12 @@ set(libStreams_SOURCES
     ${path_Streams}/IODeviceSocket.cpp
     ${path_Streams}/Socket.cpp
     ${path_Streams}/SocketFactory.cpp
+)
+
+set(path_Crypto ${CMAKE_CURRENT_SOURCE_DIR}/src/Cryptography)
+set(libCrypto_SOURCES
+    ${path_Crypto}/OpenPGPHelper.cpp
+    ${path_Crypto}/SMIMEHelper.cpp
 )
 
 if(WITH_ZLIB)
@@ -583,6 +607,15 @@ add_library(Common STATIC ${libCommon_SOURCES})
 add_dependencies(Common version)
 target_link_libraries(Common ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
 
+add_library(Crypto STATIC ${libCrypto_SOURCES})
+if(WITH_QCA)
+    target_link_libraries(Crypto ${QCA2_LIBRARIES})
+endif()
+if(WITH_MIMETIC)
+    target_link_libraries(Crypto ${MIMETIC_LIBRARIES})
+endif()
+target_link_libraries(Common Crypto)
+
 add_library(AppVersion STATIC ${libAppVersion_SOURCES})
 add_dependencies(AppVersion version)
 target_link_libraries(AppVersion Common ${QT_QTCORE_LIBRARY})
@@ -694,7 +727,7 @@ if(WITH_DESKTOP)
     # On Windows build a real Win32 GUI application without console window
     # On other platforms WIN32 flag is ignored
     add_executable(trojita WIN32 ${trojita_desktop_SOURCES} ${trojita_QM})
-    target_link_libraries(trojita AppVersion Common UiUtils DesktopGui ${STATIC_PLUGINS} ${QT_QTMAIN_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
+    target_link_libraries(trojita AppVersion Common Crypto UiUtils DesktopGui ${STATIC_PLUGINS} ${QT_QTMAIN_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
     if(NOT WITH_QT5)
         target_link_libraries(trojita MimetypesQt4)
     endif()
@@ -728,6 +761,7 @@ endif()
 if(WITH_QT5)
     qt5_use_modules(AppVersion Core)
     qt5_use_modules(Common Core Network)
+    qt5_use_modules(Crypto Core)
     qt5_use_modules(UiUtils Core Gui Network)
     qt5_use_modules(Streams Network)
     qt5_use_modules(qwwsmtpclient Network)

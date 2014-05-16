@@ -50,6 +50,7 @@
 #include "Window.h"
 #include "Common/InvokeMethod.h"
 #include "Common/MetaTypes.h"
+#include "Common/ProxyModel.h"
 #include "Common/SettingsNames.h"
 #include "Composer/SubjectMangling.h"
 #include "Imap/Model/MailboxTree.h"
@@ -60,7 +61,7 @@
 namespace Gui
 {
 
-MessageView::MessageView(QWidget *parent, QSettings *settings): QWidget(parent), m_settings(settings)
+MessageView::MessageView(QWidget *parent, QSettings *settings): QWidget(parent), messageModel(0), m_settings(settings)
 {
     QPalette pal = palette();
     pal.setColor(backgroundRole(), palette().color(QPalette::Active, QPalette::Base));
@@ -196,6 +197,16 @@ void MessageView::setMessage(const QModelIndex &index)
         messageIndex = proxy->mapToSource(messageIndex);
     }
 
+    if (messageModel && messageModel->message() != messageIndex) {
+        delete messageModel;
+        messageModel = 0;
+    }
+    if (!messageModel) {
+        messageModel = new Common::MessageModel(this, messageIndex);
+        connect(messageModel, SIGNAL(decryptionFailed(QString)), this, SLOT(handleMessageModelError(QString)));
+        emit messageModelChanged(messageModel);
+    }
+
     // The data might be available from the local cache, so let's try to save a possible roundtrip here
     // by explicitly requesting the data
     messageIndex.data(Imap::Mailbox::RolePartData);
@@ -210,7 +221,7 @@ void MessageView::setMessage(const QModelIndex &index)
         return;
     }
 
-    QModelIndex rootPartIndex = messageIndex.child(0, 0);
+    QModelIndex rootPartIndex = messageModel->index(0, 0);
 
     headerSection->show();
     if (message != messageIndex) {
@@ -224,16 +235,23 @@ void MessageView::setMessage(const QModelIndex &index)
         netAccess->setExternalsEnabled(false);
         externalElements->hide();
 
-        netAccess->setModelMessage(message);
+        netAccess->setModelMessage(rootPartIndex);
 
         m_loadingItems.clear();
         m_loadingSpinner->stop();
 
-        PartWidgetFactory::PartLoadingOptions loadingMode;
-        if (m_settings->value(Common::SettingsNames::guiPreferPlaintextRendering, QVariant(true)).toBool())
-            loadingMode |= PartWidgetFactory::PART_PREFER_PLAINTEXT_OVER_HTML;
-        viewer = factory->create(rootPartIndex, 0, loadingMode);
-        viewer->setParent(this);
+        if (!rootPartIndex.child(0,0).data(Imap::Mailbox::RolePartMimeType).isValid()) {
+            m_loadingSpinner->start(250);
+            viewer = new QWidget(this);
+            connect(messageModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
+            connect(messageModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
+        } else {
+            PartWidgetFactory::PartLoadingOptions loadingMode;
+            if (m_settings->value(Common::SettingsNames::guiPreferPlaintextRendering, QVariant(true)).toBool())
+                loadingMode |= PartWidgetFactory::PART_PREFER_PLAINTEXT_OVER_HTML;
+            viewer = factory->create(rootPartIndex.child(0,0), 0, loadingMode);
+            viewer->setParent(this);
+        }
         layout->addWidget(viewer);
         viewer->show();
         m_envelope->setMessage(message);
@@ -422,6 +440,19 @@ void MessageView::handleDataChanged(const QModelIndex &topLeft, const QModelInde
     }
 }
 
+void MessageView::handleRowsInserted(const QModelIndex &parent, int first, int last)
+{
+    Q_UNUSED(first);
+    Q_UNUSED(last);
+    qDebug() << "resetMessageView" << parent;
+    if (parent.isValid() && parent.data(Imap::Mailbox::RoleIsFetched).toBool()) {
+        qDebug() << "MessageView: message without content became available";
+        QModelIndex messageIndex = message;
+        setEmpty();
+        setMessage(messageIndex);
+    }
+}
+
 void MessageView::setHomepageUrl(const QUrl &homepage)
 {
     emptyView->load(homepage);
@@ -471,6 +502,12 @@ void MessageView::triggerSearchDialog()
 QModelIndex MessageView::currentMessage() const
 {
     return message;
+}
+
+void MessageView::handleMessageModelError(const QString &error)
+{
+    m_loadingSpinner->stop();
+    QMessageBox::warning(this, tr("Unable to open message"), error);
 }
 
 void MessageView::onWebViewLoadStarted()

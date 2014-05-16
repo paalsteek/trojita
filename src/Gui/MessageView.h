@@ -36,6 +36,10 @@ class QTimer;
 class QUrl;
 class QWebView;
 
+namespace Common {
+class MessageModel;
+}
+
 namespace Imap {
 namespace Network {
 class MsgPartNetAccessManager;
@@ -87,14 +91,17 @@ private slots:
     void newLabelAction(const QString &tag);
     void deleteLabelAction(const QString &tag);
     void handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
+    void handleRowsInserted(const QModelIndex &parent, int first, int last);
     void headerLinkActivated(QString);
     void partContextMenuRequested(const QPoint &point);
     void partLinkHovered(const QString &link, const QString &title, const QString &textContent);
     void triggerSearchDialog();
     void onWebViewLoadStarted();
     void onWebViewLoadFinished();
+    void handleMessageModelError(const QString& error);
 signals:
     void messageChanged();
+    void messageModelChanged(QAbstractItemModel *model);
     void linkHovered(const QString &url);
     void searchRequestedBy(QWebView *webView);
     void addressDetailsRequested(const QString &mail, QStringList &addresses);
@@ -111,6 +118,7 @@ private:
     QBoxLayout *layout;
     TagListWidget *tags;
     QPersistentModelIndex message;
+    Common::MessageModel *messageModel;
     Imap::Network::MsgPartNetAccessManager *netAccess;
     QPointer<Imap::Mailbox::NetworkWatcher> m_netWatcher;
     QTimer *markAsReadTimer;

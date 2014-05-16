@@ -164,6 +164,7 @@ private slots:
     void updateMessageFlags();
     void updateMessageFlags(const QModelIndex &index);
     void scrollMessageUp();
+    void slotMessageModelChanged(QAbstractItemModel *model);
     void showConnectionStatus(QObject *parser, Imap::ConnectionState state);
     void slotShowLinkTarget(const QString &link);
     void fillMatchingAbookEntries(const QString &mail, QStringList &displayNames);
@@ -243,6 +244,8 @@ private:
     QDockWidget *allDock;
     QTreeView *taskTree;
     QDockWidget *taskDock;
+    QTreeView *mailTree;
+    QDockWidget *mailDock;
 
     CompleteMessageWidget *m_messageWidget;
 
@@ -266,6 +269,7 @@ private:
     QAction *exitAction;
     QAction *showFullView;
     QAction *showTaskView;
+    QAction *showMailView;
     QAction *showImapLogger;
     QAction *logPersistent;
     QAction *showImapCapabilities;
