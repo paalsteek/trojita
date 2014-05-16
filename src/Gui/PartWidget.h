@@ -68,6 +68,15 @@ public:
                            const PartWidgetFactory::PartLoadingOptions loadingOptions);
     virtual QString quoteMe() const;
     virtual void reloadContents();
+
+public slots:
+    void handleRowsInserted(QModelIndex parent, int first, int last);
+
+private:
+    QModelIndex m_partIndex;
+    PartWidgetFactory *m_factory;
+    int m_recursionDepth;
+    const PartWidgetFactory::PartLoadingOptions m_loadingOptions;
 };
 
 /** @short Message quoting support for generic multipart/ * */

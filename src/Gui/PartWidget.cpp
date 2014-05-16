@@ -197,7 +197,13 @@ GenericMultipartWidget::GenericMultipartWidget(QWidget *parent,
         PartWidgetFactory *factory, const QModelIndex &partIndex,
         int recursionDepth, const PartWidgetFactory::PartLoadingOptions options):
     QWidget(parent)
+  , m_partIndex(partIndex)
+  , m_factory(factory)
+  , m_recursionDepth(recursionDepth)
+  , m_loadingOptions(options)
 {
+    qDebug() << "GenericMultipartWidget:" << partIndex;
+    connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
     setContentsMargins(0, 0, 0, 0);
     // multipart/mixed or anything else, as mandated by RFC 2046, Section 5.1.3
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -214,6 +220,26 @@ GenericMultipartWidget::GenericMultipartWidget(QWidget *parent,
 QString GenericMultipartWidget::quoteMe() const
 {
     return quoteMeHelper(children());
+}
+
+void GenericMultipartWidget::handleRowsInserted(QModelIndex parent, int first, int last)
+{
+    qDebug() << "GenericMultipartWidget::handleRowsInserted(" << parent << "," << first << "," << last << ")";
+    if (parent == m_partIndex) {
+        qDebug() << "new data inserted in" << parent.data(Imap::Mailbox::RolePartMimeType);
+        QLayout *l = layout();
+        delete l;
+        QVBoxLayout *layout = new QVBoxLayout(this);
+        layout->setSpacing(0);
+        for (int i = 0; i < parent.model()->rowCount(parent); ++i) {
+            using namespace Imap::Mailbox;
+            QModelIndex anotherPart = parent.child(i, 0);
+            qDebug() << "Part" << i << ":" << anotherPart.data(Imap::Mailbox::RolePartMimeType);
+            Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
+            QWidget *res = m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions));
+            layout->addWidget(res);
+        }
+    }
 }
 
 Message822Widget::Message822Widget(QWidget *parent,

@@ -69,6 +69,8 @@ trojita_option(WITH_ZLIB "Build with zlib library" AUTO)
 trojita_option(WITH_SHARED_PLUGINS "Enable shared dynamic plugins" ON "NOT UBUNTU_CLICK_MODE")
 trojita_option(WITH_TESTS "Build tests" ON "NOT WITH_HARMATTAN")
 trojita_option(DEV_FATAL_WARNINGS "Turn build warnings into errors (developers only)" OFF)
+trojita_option(WITH_MIMETIC "Build with MIME parser" AUTO)
+trojita_option(WITH_GNUPG "Build with GnuPG support" AUTO "WITH_MIMETIC")
 
 if(WIN32)
     trojita_option(WITH_NSIS "Build Windows NSIS installer" AUTO)
@@ -124,6 +126,9 @@ else()
 endif()
 
 trojita_find_package(Git "" "" "" "")
+
+trojita_find_package(QCA2 "" "" "Qt Cryptographic Architecture" "" WITH_GNUPG)
+trojita_find_package(Mimetic "" "" "" "" WITH_MIMETIC)
 
 if(WIN32)
     trojita_find_package(MakeNSIS "" "http://nsis.sourceforge.net" "Nullsoft Scriptable Install System" "Needed for building Windows installer" WITH_NSIS)
@@ -250,6 +255,12 @@ if(NOT ZLIB_FOUND)
     trojita_find_package(ZLIB "" "" "" "" WITH_ZLIB)
 endif()
 
+if(WITH_GNUPG)
+  set(TROJITA_HAVE_GNUPG True)
+else()
+  set(TROJITA_HAVE_GNUPG False)
+endif()
+
 if(WITH_ZLIB)
     set(TROJITA_HAVE_ZLIB True)
     message(STATUS "Support for COMPRESS=DEFLATE enabled")
@@ -270,6 +281,7 @@ set(libCommon_SOURCES
     ${path_Common}/DeleteAfter.cpp
     ${path_Common}/FileLogger.cpp
     ${path_Common}/MetaTypes.cpp
+    ${path_Common}/ProxyModel.cpp
     ${path_Common}/Paths.cpp
     ${path_Common}/SettingsNames.cpp
 )
@@ -320,6 +332,12 @@ set(libStreams_SOURCES
     ${path_Streams}/IODeviceSocket.cpp
     ${path_Streams}/Socket.cpp
     ${path_Streams}/SocketFactory.cpp
+)
+
+set(path_Crypto ${CMAKE_CURRENT_SOURCE_DIR}/src/Cryptography)
+set(libCrypto_SOURCES
+    ${path_Crypto}/OpenPGPHelper.cpp
+    ${path_Crypto}/SMIMEHelper.cpp
 )
 
 if(WITH_ZLIB)
@@ -526,6 +544,12 @@ else()
         ${path_Imap}/Parser/Rfc5322HeaderParser.generated.cpp)
 endif()
 
+if(WITH_MIMETIC)
+    set(TROJITA_HAVE_MIMETIC True)
+else()
+    set(TROJITA_HAVE_MIMETIC False)
+endif()
+
 set(path_AbookAddressbook ${CMAKE_CURRENT_SOURCE_DIR}/src/AbookAddressbook)
 set(libAbookAddressbook_SOURCES
     ${path_AbookAddressbook}/AbookAddressbook.cpp
@@ -605,6 +629,15 @@ add_library(Common STATIC ${libCommon_SOURCES})
 set_property(TARGET Common APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
 add_dependencies(Common version)
 target_link_libraries(Common ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
+
+if(WITH_GNUPG)
+    add_library(Crypto STATIC ${libCrypto_SOURCES})
+    target_link_libraries(Crypto ${QCA2_LIBRARIES})
+    target_link_libraries(Common Crypto)
+endif()
+if(WITH_MIMETIC)
+    target_link_libraries(Crypto ${MIMETIC_LIBRARIES})
+endif()
 
 add_library(AppVersion STATIC ${libAppVersion_SOURCES})
 set_property(TARGET AppVersion APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
@@ -734,6 +767,9 @@ if(WITH_DESKTOP)
     if(WITH_ZLIB)
         target_link_libraries(trojita ${ZLIB_LIBRARIES})
     endif()
+    if(WITH_GNUPG)
+        target_link_libraries(trojita Crypto)
+    endif()
 
     add_executable(be.contacts ${be_contacts_SOURCES})
     set_property(TARGET be.contacts APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
@@ -766,6 +802,7 @@ if(WITH_QT5)
     qt5_use_modules(Common Core Network)
     qt5_use_modules(UiUtils Core Gui Network)
     qt5_use_modules(Streams Network)
+    qt5_use_modules(Crypto Core)
     qt5_use_modules(qwwsmtpclient Network)
     qt5_use_modules(MSA Network)
     qt5_use_modules(Composer Gui Network)
