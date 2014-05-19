@@ -196,7 +196,7 @@ void MessageView::setMessage(const QModelIndex &index)
     QModelIndex messageIndex = Imap::deproxifiedIndex(index);
     Q_ASSERT(messageIndex.isValid());
 
-    Common::MessageModel* pModel = new Common::MessageModel(messageIndex, this);
+    Common::MessageModel* pModel = new Common::MessageModel(this, messageIndex);
 
     // The data might be available from the local cache, so let's try to save a possible roundtrip here
     // by explicitly requesting the data

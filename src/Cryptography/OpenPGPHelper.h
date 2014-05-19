@@ -38,10 +38,10 @@ namespace Cryptography {
     public:
         OpenPGPHelper(QObject* parent);
         ~OpenPGPHelper() {}
-        void decrypt(QModelIndex parent);
+        void decrypt(const QModelIndex& parent);
 
     signals:
-        void dataDecrypted(const QModelIndex& index, mimetic::MimeEntity *pMe);
+        void dataDecrypted(mimetic::MimeEntity *pMe);
 
     private slots:
         void handleDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);

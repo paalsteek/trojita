@@ -24,33 +24,88 @@
 #define COMMON_MODEL_H
 
 #include <QHash>
-#include <QIdentityProxyModel>
 
 #include "Cryptography/OpenPGPHelper.h"
 #include "Cryptography/SMIMEHelper.h"
 
 namespace Common {
 
-class MessagePart {
+class MessagePart : public QObject {
+    Q_OBJECT
+
 public:
-    MessagePart(QModelIndex sourceIndex, MessagePart *parent = 0);
-    MessagePart(mimetic::MimeEntity* pMe, MessagePart *parent = 0);
-    ~MessagePart();
+    MessagePart(MessagePart *parent, int row);
+    virtual ~MessagePart();
 
-    void addChild(MessagePart *child) { m_children.append(child); }
-    MessagePart* child(int row) { return m_children[row]; }
     MessagePart* parent() { return m_parent; }
-    int rowCount() { return m_children.size(); }
+    const int row() { return m_row; }
+    virtual MessagePart* child(int row) = 0;
+    virtual int rowCount() const = 0;
 
-    int findRow(MessagePart *child);
+    virtual QVariant data(int role) = 0;
 
-    QVariant mimetype();
+signals:
+    void partChanged();
 
 private:
     MessagePart *m_parent;
-    QList<MessagePart*> m_children;
-    mimetic::MimeEntity *m_me;
+    int m_row;
+};
+
+class ProxyMessagePart : public MessagePart {
+    Q_OBJECT
+
+public:
+    ProxyMessagePart(MessagePart *parent, int row, const QModelIndex &sourceIndex);
+    ~ProxyMessagePart();
+
+    MessagePart* child(int row);
+    int rowCount() const;
+
+    QVariant data(int role) { return m_sourceIndex.data(role); }
+
+public slots:
+    void handleSourceDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
+
+private:
     QModelIndex m_sourceIndex;
+};
+
+class LocalMessagePart : public MessagePart {
+public:
+    LocalMessagePart(MessagePart *parent, int row, mimetic::MimeEntity* pMe);
+    ~LocalMessagePart();
+
+    MessagePart* child(int row);
+    int rowCount() const;
+
+    QVariant data(int role);
+
+private:
+    QString mimetype() const;
+
+protected:
+    mimetic::MimeEntity *m_me;
+};
+
+class EncryptedMessagePart : public LocalMessagePart {
+    Q_OBJECT
+
+public:
+    EncryptedMessagePart(MessagePart *parent, int row, MessagePart *raw);
+
+    QVariant data(int role) { return LocalMessagePart::data(role); }
+
+    MessagePart* rawPart() { return m_raw; }
+
+signals:
+    void partDecrypted();
+
+public slots:
+    void handleDataDecrypted(mimetic::MimeEntity* pMe);
+
+protected:
+    MessagePart* m_raw;
 };
 
 class MessageModel: public QAbstractItemModel
@@ -58,7 +113,7 @@ class MessageModel: public QAbstractItemModel
     Q_OBJECT
 
 public:
-    MessageModel(QModelIndex message, QObject *parent = 0);
+    MessageModel(QObject *parent, const QModelIndex& message);
     ~MessageModel();
 
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
@@ -67,8 +122,12 @@ public:
     int columnCount(const QModelIndex &parent) const { return 0; }
     QVariant data(const QModelIndex &index, int role) const;
 
-private:
-    QModelIndex m_message;
+private slots:
+    void handlePartChanged();
+    void handlePartDecrypted();
+
+protected:
+    const QModelIndex m_message;
     Cryptography::OpenPGPHelper* m_pgpHelper;
     Cryptography::SMIMEHelper* m_smimeHelper;
 };

@@ -32,6 +32,8 @@ namespace Cryptography {
     public:
         SMIMEHelper(QObject* parent);
         ~SMIMEHelper() {}
+
+        void decrypt(const QModelIndex& parent) {}
     private:
         QCA::CMS m_cms;
     };

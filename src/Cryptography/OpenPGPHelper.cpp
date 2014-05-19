@@ -32,10 +32,9 @@ OpenPGPHelper::OpenPGPHelper(QObject *parent)
     , m_partIndex()
     , m_pgp(this)
 {
-
 }
 
-void OpenPGPHelper::decrypt(QModelIndex parent)
+void OpenPGPHelper::decrypt(const QModelIndex &parent)
 {
     qDebug() << "decrypt...";
     m_partIndex = parent;
@@ -93,7 +92,7 @@ void OpenPGPHelper::decryptionFinished()
         }
         qDebug() << message;
         mimetic::MimeEntity *me = new mimetic::MimeEntity(message.begin(), message.end());
-        emit dataDecrypted(m_partIndex, me);
+        emit dataDecrypted(me);
     }
 }
 
