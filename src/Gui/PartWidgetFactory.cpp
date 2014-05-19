@@ -67,17 +67,12 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
                              "the top-most thousand items or so are shown."), 0);
     }
 
-    QModelIndex proxyIndex = Common::ProxyModel::findProxyIndex(partIndex);
-    Q_ASSERT(proxyIndex.isValid());
-    const Common::ProxyModel* proxyModel = qobject_cast<const Common::ProxyModel*>(proxyIndex.model());
-    Q_ASSERT(proxyModel);
-
-    QString mimeType = proxyIndex.data(Imap::Mailbox::RolePartMimeType).toString().toLower();
+    QString mimeType = partIndex.data(Imap::Mailbox::RolePartMimeType).toString().toLower();
     bool isMessageRfc822 = mimeType == QLatin1String("message/rfc822");
     bool isCompoundMimeType = mimeType.startsWith(QLatin1String("multipart/")) || isMessageRfc822;
 
     if (loadingMode & PART_IS_HIDDEN) {
-        return new LoadablePartWidget(0, manager, proxyIndex, m_messageView, this, recursionDepth + 1,
+        return new LoadablePartWidget(0, manager, partIndex, m_messageView, this, recursionDepth + 1,
                                       loadingMode | PART_IGNORE_CLICKTHROUGH);
     }
 
@@ -106,9 +101,9 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
 
     // Check whether it shall be wrapped inside an AttachmentView
     // From section 2.8 of RFC 2183: "Unrecognized disposition types should be treated as `attachment'."
-    const QByteArray contentDisposition = proxyIndex.data(Imap::Mailbox::RolePartBodyDisposition).toByteArray().toLower();
+    const QByteArray contentDisposition = partIndex.data(Imap::Mailbox::RolePartBodyDisposition).toByteArray().toLower();
     const bool isInline = contentDisposition.isEmpty() || contentDisposition == "inline";
-    const bool looksLikeAttachment = !proxyIndex.data(Imap::Mailbox::RolePartFileName).toString().isEmpty();
+    const bool looksLikeAttachment = !partIndex.data(Imap::Mailbox::RolePartFileName).toString().isEmpty();
     const bool wrapInAttachmentView = !(loadingMode & PART_IGNORE_DISPOSITION_ATTACHMENT)
             && (looksLikeAttachment || !isInline || !recognizedMimeType || isDerivedMimeType || isMessageRfc822);
     if (wrapInAttachmentView) {
@@ -139,8 +134,8 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
             if (m_netWatcher && m_netWatcher->effectiveNetworkPolicy() == Imap::Mailbox::NETWORK_OFFLINE) {
                 // This is to prevent a clickthrough when offline
                 options |= PART_IGNORE_CLICKTHROUGH;
-            }
-            contentWidget = new LoadablePartWidget(0, manager, proxyIndex, m_messageView, this, recursionDepth + 1, options);
+            }*/
+            contentWidget = new LoadablePartWidget(0, manager, partIndex, m_messageView, this, recursionDepth + 1, options);
             if (!isInline) {
                 contentWidget->hide();
             }
@@ -149,16 +144,16 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
         // and not fetched yet. Arguably, that's a bug -- an item which is marked online shall not be hidden.
         // Wrapping via a clickthrough is fine, though; the user is clearly informed that this item *should* be visible,
         // yet the bandwidth is not excessively trashed.
-        return new AttachmentView(0, manager, proxyIndex, m_messageView, contentWidget);
+        return new AttachmentView(0, manager, partIndex, m_messageView, contentWidget);
     }
 
     // Now we know for sure that it's not supposed to be wrapped in an AttachmentView, cool.
     if (mimeType.startsWith(QLatin1String("multipart/"))) {
         // it's a compound part
         if (mimeType == QLatin1String("multipart/alternative")) {
-            return new MultipartAlternativeWidget(0, this, proxyIndex, recursionDepth, loadingMode);
+            return new MultipartAlternativeWidget(0, this, partIndex, recursionDepth, loadingMode);
         } else if (mimeType == QLatin1String("multipart/signed")) {
-            return new MultipartSignedWidget(0, this, proxyIndex, recursionDepth, loadingMode);
+            return new MultipartSignedWidget(0, this, partIndex, recursionDepth, loadingMode);
         } else if (mimeType == QLatin1String("multipart/related")) {
             // The purpose of this section is to find a text/html e-mail, along with its associated body parts, and hide
             // everything else than the HTML widget.
@@ -180,7 +175,7 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
 
             if (!mainPartIndex.isValid()) {
                 // The Content-Type-based start parameter was not terribly useful. Let's find the HTML part manually.
-                QModelIndex candidate = proxyIndex.child(0, 0);
+                QModelIndex candidate = partIndex.child(0, 0);
                 while (candidate.isValid()) {
                     if (candidate.data(RolePartMimeType).toString() == QLatin1String("text/html")) {
                         mainPartIndex = candidate;
@@ -196,20 +191,20 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
                 } else {
                     // Sorry, but anything else than text/html is by definition suspicious here. Better than picking some random
                     // choice, let's just show everything.
-                    return new GenericMultipartWidget(0, this, proxyIndex, recursionDepth, loadingMode);
+                    return new GenericMultipartWidget(0, this, partIndex, recursionDepth, loadingMode);
                 }
             } else {
                 // The RFC2387's wording is clear that in absence of an explicit START argument, the first part is the starting one.
                 // On the other hand, I've seen real-world messages whose first part is some utter garbage (an image sent as
                 // application/octet-stream, for example) and some *other* part is an HTML text. In that case (and if we somehow
                 // failed to pick the HTML part by a heuristic), it's better to show everything.
-                return new GenericMultipartWidget(0, this, proxyIndex, recursionDepth, loadingMode);
+                return new GenericMultipartWidget(0, this, partIndex, recursionDepth, loadingMode);
             }
         } else {
-            return new GenericMultipartWidget(0, this, proxyIndex, recursionDepth, loadingMode);
+            return new GenericMultipartWidget(0, this, partIndex, recursionDepth, loadingMode);
         }
     } else if (mimeType == QLatin1String("message/rfc822")) {
-        return new Message822Widget(0, this, proxyIndex, recursionDepth, loadingMode);
+        return new Message822Widget(0, this, partIndex, recursionDepth, loadingMode);
     } else {
         partIndex.data(Imap::Mailbox::RolePartForceFetchFromCache);
 
@@ -218,7 +213,7 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
                 (m_netWatcher && m_netWatcher->desiredNetworkPolicy() != Imap::Mailbox::NETWORK_EXPENSIVE ) ||
                 partIndex.data(Imap::Mailbox::RolePartOctets).toInt() < ExpensiveFetchThreshold) {
             // Show it directly without any fancy wrapping
-            return new SimplePartWidget(0, manager, proxyIndex, m_messageView);
+            return new SimplePartWidget(0, manager, partIndex, m_messageView);
         } else {
             return new LoadablePartWidget(0, manager, partIndex, m_messageView, this, recursionDepth + 1,
                                           (m_netWatcher && m_netWatcher->effectiveNetworkPolicy() != Imap::Mailbox::NETWORK_OFFLINE) ?

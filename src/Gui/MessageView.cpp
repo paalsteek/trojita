@@ -196,15 +196,13 @@ void MessageView::setMessage(const QModelIndex &index)
     QModelIndex messageIndex = Imap::deproxifiedIndex(index);
     Q_ASSERT(messageIndex.isValid());
 
-    Common::ProxyModel* pModel = new Common::ProxyModel(this);
-    pModel->setSourceModel(realModel);
-    QModelIndex proxyIndex = pModel->mapFromSource(messageIndex);
+    Common::MessageModel* pModel = new Common::MessageModel(messageIndex, this);
 
     // The data might be available from the local cache, so let's try to save a possible roundtrip here
     // by explicitly requesting the data
     messageIndex.data(Imap::Mailbox::RolePartData);
 
-    if (!proxyIndex.data(Imap::Mailbox::RoleIsFetched).toBool()) {
+    if (!messageIndex.data(Imap::Mailbox::RoleIsFetched).toBool()) {
         // This happens when the message placeholder is already available in the GUI, but the actual message data haven't been
         // loaded yet. This is especially common with the threading model.
         // Note that the data might be already available in the cache, it's just that it isn't in the mailbox tree yet.
@@ -214,7 +212,7 @@ void MessageView::setMessage(const QModelIndex &index)
         return;
     }
 
-    QModelIndex rootPartIndex = proxyIndex.child(0, 0);
+    QModelIndex rootPartIndex = pModel->index(0, 0);
 
     headerSection->show();
     if (message != messageIndex) {
@@ -243,7 +241,7 @@ void MessageView::setMessage(const QModelIndex &index)
         m_envelope->setMessage(message);
 
         tags->show();
-        tags->setTagList(proxyIndex.data(Imap::Mailbox::RoleMessageFlags).toStringList());
+        tags->setTagList(messageIndex.data(Imap::Mailbox::RoleMessageFlags).toStringList());
         disconnect(this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
         connect(messageIndex.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
 

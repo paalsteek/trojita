@@ -31,29 +31,46 @@
 
 namespace Common {
 
-class ProxyModel: public QIdentityProxyModel
+class MessagePart {
+public:
+    MessagePart(QModelIndex sourceIndex, MessagePart *parent = 0);
+    MessagePart(mimetic::MimeEntity* pMe, MessagePart *parent = 0);
+    ~MessagePart();
+
+    void addChild(MessagePart *child) { m_children.append(child); }
+    MessagePart* child(int row) { return m_children[row]; }
+    MessagePart* parent() { return m_parent; }
+    int rowCount() { return m_children.size(); }
+
+    int findRow(MessagePart *child);
+
+    QVariant mimetype();
+
+private:
+    MessagePart *m_parent;
+    QList<MessagePart*> m_children;
+    mimetic::MimeEntity *m_me;
+    QModelIndex m_sourceIndex;
+};
+
+class MessageModel: public QAbstractItemModel
 {
     Q_OBJECT
 
 public:
-    ProxyModel(QObject *parent = 0);
-    ~ProxyModel();
-    QVariant data(const QModelIndex &proxyIndex, int role) const;
+    MessageModel(QModelIndex message, QObject *parent = 0);
+    ~MessageModel();
+
+    QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
+    QModelIndex parent(const QModelIndex &child) const;
     int rowCount(const QModelIndex &parent) const;
-    static QModelIndex findProxyIndex(QModelIndex index);
-    static QModelIndex findEncryptedRoot(QModelIndex index);
-    QModelIndex index(int row, int column, const QModelIndex &parent) const;
-
-    bool isNetworkOnline() const { return qobject_cast<Imap::Mailbox::Model*>(sourceModel())->isNetworkOnline(); }
-    bool isNetworkAvailable() const { return qobject_cast<Imap::Mailbox::Model*>(sourceModel())->isNetworkAvailable(); }
-
-private slots:
-    void handleDecryptedData(const QModelIndex &index, mimetic::MimeEntity* me);
+    int columnCount(const QModelIndex &parent) const { return 0; }
+    QVariant data(const QModelIndex &index, int role) const;
 
 private:
+    QModelIndex m_message;
     Cryptography::OpenPGPHelper* m_pgpHelper;
     Cryptography::SMIMEHelper* m_smimeHelper;
-    mutable QHash<QString, mimetic::MimeEntity*> m_parts;
 };
 }
 #endif /* COMMON_MODEL_H */

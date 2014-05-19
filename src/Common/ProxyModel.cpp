@@ -31,6 +31,125 @@ namespace Common {
 //#ifdef TROJITA_HAVE_GNUPG
 QCA::Initializer init;
 //#endif // TROJITA_HAVE_GNUPG
+
+MessagePart::MessagePart(QModelIndex sourceIndex, MessagePart *parent)
+    : m_parent(parent)
+    , m_children()
+    , m_me(0)
+    , m_sourceIndex(sourceIndex)
+{
+}
+
+MessagePart::MessagePart(mimetic::MimeEntity *pMe, MessagePart *parent)
+    :m_parent(parent)
+    , m_children()
+    , m_me(pMe)
+    , m_sourceIndex()
+{
+
+}
+
+MessagePart::~MessagePart()
+{
+    Q_FOREACH(MessagePart* part, m_children)
+    {
+        delete part;
+    }
+}
+
+int MessagePart::findRow(MessagePart *child)
+{
+    for (int i = 0; i < m_children.size(); ++i)
+    {
+        if (m_children[i] == child)
+            return i;
+    }
+
+    return -1;
+}
+
+QVariant MessagePart::mimetype()
+{
+    if (m_me) {
+        QString type = QString::fromStdString(m_me->header().contentType().type());
+        QString subtype = QString::fromStdString(m_me->header().contentType().subtype());
+
+        return QString("%1/%2").arg(type, subtype);
+    } else if (m_sourceIndex.isValid()) {
+        return m_sourceIndex.data(Imap::Mailbox::RolePartMimeType);
+    }
+
+    return QVariant();
+}
+
+MessageModel::MessageModel(QModelIndex message, QObject *parent)
+    : QAbstractItemModel(parent)
+    , m_message(message)
+{
+}
+
+MessageModel::~MessageModel()
+{
+}
+
+QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) const
+{
+    if (!parent.isValid())
+        return createIndex(row, column, new MessagePart(m_message.child(0,0)));
+
+    MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
+    return createIndex(row, column, part->child(row));
+}
+
+QModelIndex MessageModel::parent(const QModelIndex &child) const
+{
+    if (!child.isValid())
+        return QModelIndex();
+
+    MessagePart* part = static_cast<MessagePart*>(child.internalPointer());
+    if (!part->parent())
+        return QModelIndex();
+
+    if (int row = part->parent()->findRow(part) >= 0)
+        return createIndex(row, 0, part->parent());
+
+    return QModelIndex();
+}
+
+int MessageModel::rowCount(const QModelIndex &parent) const
+{
+    MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
+    return part->rowCount();
+}
+
+QVariant MessageModel::data(const QModelIndex &index, int role) const
+{
+    MessagePart* part = static_cast<MessagePart*>(index.internalPointer());
+    switch (role) {
+    case Imap::Mailbox::RolePartData:
+        break;
+    case Imap::Mailbox::RolePartMimeType:
+        return part->mimetype();
+    case Imap::Mailbox::RolePartCharset:
+    case Imap::Mailbox::RolePartContentFormat:
+    case Imap::Mailbox::RolePartContentDelSp:
+    case Imap::Mailbox::RolePartEncoding:
+    case Imap::Mailbox::RolePartBodyFldId:
+    case Imap::Mailbox::RolePartBodyDisposition:
+    case Imap::Mailbox::RolePartFileName:
+    case Imap::Mailbox::RolePartOctets:
+    case Imap::Mailbox::RolePartId:
+    case Imap::Mailbox::RolePartPathToPart:
+    case Imap::Mailbox::RolePartMultipartRelatedMainCid:
+    case Imap::Mailbox::RolePartIsTopLevelMultipart:
+    default:
+        break;
+    }
+
+    return QVariant();
+}
+
+#if 0
 ProxyModel::ProxyModel(QObject *parent)
     : QIdentityProxyModel(parent)
     , m_pgpHelper(new Cryptography::OpenPGPHelper(this))
@@ -240,4 +359,5 @@ QModelIndex ProxyModel::findEncryptedRoot(QModelIndex index)
 
     return QModelIndex();
 }
+#endif
 }
