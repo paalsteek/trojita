@@ -63,7 +63,7 @@
 namespace Gui
 {
 
-MessageView::MessageView(QWidget *parent, QSettings *settings): QWidget(parent), m_settings(settings)
+MessageView::MessageView(QWidget *parent, QSettings *settings): QWidget(parent), messageModel(0), m_settings(settings)
 {
     QPalette pal = palette();
     pal.setColor(backgroundRole(), palette().color(QPalette::Active, QPalette::Base));
@@ -196,7 +196,13 @@ void MessageView::setMessage(const QModelIndex &index)
     QModelIndex messageIndex = Imap::deproxifiedIndex(index);
     Q_ASSERT(messageIndex.isValid());
 
-    Common::MessageModel* pModel = new Common::MessageModel(this, messageIndex);
+    if (messageModel && messageModel->message() != messageIndex) {
+        delete messageModel;
+        messageModel = 0;
+    }
+    if (!messageModel) {
+        messageModel = new Common::MessageModel(this, messageIndex);
+    }
 
     // The data might be available from the local cache, so let's try to save a possible roundtrip here
     // by explicitly requesting the data
@@ -212,7 +218,19 @@ void MessageView::setMessage(const QModelIndex &index)
         return;
     }
 
-    QModelIndex rootPartIndex = pModel->index(0, 0);
+    QModelIndex rootPartIndex = messageModel->index(0, 0);
+
+    // TODO: find a better check or fix
+    if (!rootPartIndex.data(Imap::Mailbox::RoleIsFetched).toBool()) {
+        qDebug() << "connecting rowsInserted";
+        m_envelope->setMessage(message);
+        viewer->hide();
+        headerSection->show();
+        m_loadingSpinner->start(250);
+        message = messageIndex;
+        connect(messageModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
+        return;
+    }
 
     headerSection->show();
     if (message != messageIndex) {
@@ -416,6 +434,19 @@ void MessageView::handleDataChanged(const QModelIndex &topLeft, const QModelInde
             setMessage(topLeft);
         }
         tags->setTagList(message.data(Imap::Mailbox::RoleMessageFlags).toStringList());
+    }
+}
+
+void MessageView::handleRowsInserted(const QModelIndex &parent, int first, int last)
+{
+    Q_UNUSED(first);
+    Q_UNUSED(last);
+    qDebug() << "resetMessageView" << parent;
+    if (parent.isValid() && parent.data(Imap::Mailbox::RoleIsFetched).toBool()) {
+        qDebug() << "MessageView: message without content became available";
+        QModelIndex messageIndex = message;
+        setEmpty();
+        setMessage(messageIndex);
     }
 }
 

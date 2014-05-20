@@ -134,7 +134,7 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
             if (m_netWatcher && m_netWatcher->effectiveNetworkPolicy() == Imap::Mailbox::NETWORK_OFFLINE) {
                 // This is to prevent a clickthrough when offline
                 options |= PART_IGNORE_CLICKTHROUGH;
-            }*/
+            }
             contentWidget = new LoadablePartWidget(0, manager, partIndex, m_messageView, this, recursionDepth + 1, options);
             if (!isInline) {
                 contentWidget->hide();
@@ -165,8 +165,6 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
             // just wrong.
 
             // Let's see if we know what the root part is
-
-            //TODO: add proxyPart here
             QModelIndex mainPartIndex;
             QVariant mainPartCID = partIndex.data(RolePartMultipartRelatedMainCid);
             if (mainPartCID.isValid()) {

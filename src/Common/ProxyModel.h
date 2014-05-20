@@ -68,7 +68,7 @@ public slots:
     void handleSourceDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
 
 private:
-    QModelIndex m_sourceIndex;
+    QPersistentModelIndex m_sourceIndex;
 };
 
 class LocalMessagePart : public MessagePart {
@@ -83,6 +83,15 @@ public:
 
 private:
     QString mimetype() const;
+    QByteArray data() const;
+    int octets() const;
+    QString charset() const;
+    QString protocol() const;
+    QString filename() const;
+    QString format() const;
+    QString delsp() const;
+    QByteArray transferEncoding() const;
+    QByteArray bodyDisposition() const;
 
 protected:
     mimetic::MimeEntity *m_me;
@@ -122,12 +131,15 @@ public:
     int columnCount(const QModelIndex &parent) const { return 0; }
     QVariant data(const QModelIndex &index, int role) const;
 
+    QModelIndex message() { return m_message; }
+
 private slots:
     void handlePartChanged();
     void handlePartDecrypted();
 
 protected:
-    const QModelIndex m_message;
+    const QPersistentModelIndex m_message;
+    mutable MessagePart *m_rootPart;
     Cryptography::OpenPGPHelper* m_pgpHelper;
     Cryptography::SMIMEHelper* m_smimeHelper;
 };
