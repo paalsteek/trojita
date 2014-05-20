@@ -162,7 +162,7 @@ public:
                  const QVariant &bodyExtension):
         OneMessage(mediaType, mediaSubType, bodyFldParam, bodyFldId,
                    bodyFldDesc, bodyFldEnc, bodyFldOctets, bodyFldMd5,
-                   bodyFldDsp, bodyFldLang, bodyFldLoc, bodyExtension) {};
+                   bodyFldDsp, bodyFldLang, bodyFldLoc, bodyExtension) {}
     virtual QTextStream &dump(QTextStream &s, const int indent) const;
     using OneMessage::dump;
     /* No need for "virtual bool eq( const AbstractData& other ) const" as
