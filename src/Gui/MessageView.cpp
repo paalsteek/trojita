@@ -202,6 +202,8 @@ void MessageView::setMessage(const QModelIndex &index)
     }
     if (!messageModel) {
         messageModel = new Common::MessageModel(this, messageIndex);
+        connect(messageModel, SIGNAL(decryptionFailed(QString)), this, SLOT(handleMessageModelError(QString)));
+        emit messageModelChanged(messageModel);
     }
 
     // The data might be available from the local cache, so let's try to save a possible roundtrip here
@@ -220,18 +222,6 @@ void MessageView::setMessage(const QModelIndex &index)
 
     QModelIndex rootPartIndex = messageModel->index(0, 0);
 
-    // TODO: find a better check or fix
-    if (!rootPartIndex.data(Imap::Mailbox::RoleIsFetched).toBool()) {
-        qDebug() << "connecting rowsInserted";
-        m_envelope->setMessage(message);
-        viewer->hide();
-        headerSection->show();
-        m_loadingSpinner->start(250);
-        message = messageIndex;
-        connect(messageModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
-        return;
-    }
-
     headerSection->show();
     if (message != messageIndex) {
         emptyView->hide();
@@ -244,16 +234,23 @@ void MessageView::setMessage(const QModelIndex &index)
         netAccess->setExternalsEnabled(false);
         externalElements->hide();
 
-        netAccess->setModelMessage(message);
+        netAccess->setModelMessage(rootPartIndex);
 
         m_loadingItems.clear();
         m_loadingSpinner->stop();
 
-        PartWidgetFactory::PartLoadingOptions loadingMode;
-        if (m_settings->value(Common::SettingsNames::guiPreferPlaintextRendering, QVariant(true)).toBool())
-            loadingMode |= PartWidgetFactory::PART_PREFER_PLAINTEXT_OVER_HTML;
-        viewer = factory->create(rootPartIndex, 0, loadingMode);
-        viewer->setParent(this);
+        if (!rootPartIndex.child(0,0).data(Imap::Mailbox::RolePartMimeType).isValid()) {
+            m_loadingSpinner->start(250);
+            viewer = new QWidget(this);
+            connect(messageModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
+            connect(messageModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
+        } else {
+            PartWidgetFactory::PartLoadingOptions loadingMode;
+            if (m_settings->value(Common::SettingsNames::guiPreferPlaintextRendering, QVariant(true)).toBool())
+                loadingMode |= PartWidgetFactory::PART_PREFER_PLAINTEXT_OVER_HTML;
+            viewer = factory->create(rootPartIndex.child(0,0), 0, loadingMode);
+            viewer->setParent(this);
+        }
         layout->addWidget(viewer);
         viewer->show();
         m_envelope->setMessage(message);
@@ -499,6 +496,12 @@ void MessageView::triggerSearchDialog()
 QModelIndex MessageView::currentMessage() const
 {
     return message;
+}
+
+void MessageView::handleMessageModelError(const QString &error)
+{
+    m_loadingSpinner->stop();
+    QMessageBox::warning(this, tr("Unable to open message"), error);
 }
 
 void MessageView::onWebViewLoadStarted()

@@ -99,8 +99,10 @@ private slots:
     void triggerSearchDialog();
     void onWebViewLoadStarted();
     void onWebViewLoadFinished();
+    void handleMessageModelError(const QString& error);
 signals:
     void messageChanged();
+    void messageModelChanged(QAbstractItemModel *model);
     void linkHovered(const QString &url);
     void searchRequestedBy(QWebView *webView);
     void addressDetailsRequested(const QString &mail, QStringList &addresses);

@@ -64,12 +64,13 @@ MsgPartNetworkReply::MsgPartNetworkReply(MsgPartNetAccessManager *parent, const 
 /** @short Check to see whether the data which concern this object has arrived already */
 void MsgPartNetworkReply::slotModelDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
-    Q_UNUSED(bottomRight);
-    // FIXME: use bottomRight as well!
+    Q_ASSERT(topLeft.model() == bottomRight.model() && topLeft.parent() == bottomRight.parent());
     if (topLeft.model() != part.model()) {
         return;
     }
-    if (topLeft == part) {
+    if (topLeft.parent() == part.parent()
+            && topLeft.row() <= part.row()
+            && part.row() <= bottomRight.row()) {
         slotMyDataChanged();
     }
 }

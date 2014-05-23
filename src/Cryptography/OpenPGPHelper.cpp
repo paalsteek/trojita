@@ -36,11 +36,8 @@ OpenPGPHelper::OpenPGPHelper(QObject *parent)
 
 void OpenPGPHelper::decrypt(const QModelIndex &parent)
 {
-    qDebug() << "decrypt...";
     m_partIndex = parent;
-    qDebug() << "m_partIndex" << m_partIndex << m_partIndex.data(Imap::Mailbox::RolePartMimeType);
     QModelIndex sourceIndex = m_partIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
-    qDebug() << "sourceIndex" << sourceIndex << sourceIndex.data(Imap::Mailbox::RolePartMimeType);
     Q_ASSERT(sourceIndex.model()->rowCount(sourceIndex) == 2);
     connect(sourceIndex.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
     //Trigger lazy loading of the required message parts
@@ -54,22 +51,19 @@ void OpenPGPHelper::handleDataChanged(const QModelIndex &topLeft, const QModelIn
 {
     Q_UNUSED(topLeft)
     Q_UNUSED(bottomRight)
-    qDebug() << "handleDataChanged";
     QModelIndex sourceIndex = m_partIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
     if ( sourceIndex.child(0,0).data(Imap::Mailbox::RoleIsFetched).toBool() &&
          sourceIndex.child(1,0).data(Imap::Mailbox::RoleIsFetched).toBool() )
     {
-        qDebug() << "data fetched";
         disconnect(sourceIndex.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
 
         QModelIndex versionIndex = sourceIndex.child(0,0), encIndex = sourceIndex.child(1,0);
         if ( !versionIndex.data(Imap::Mailbox::RolePartData).toString().contains(QLatin1String("Version: 1")) )
         {
-            //this->layout()->addWidget(new QLabel(tr("Unsupported Version"))); //TODO: this message should be more helpful
+            emit decryptionFailed(tr("Unable to decrypt message: Unsupported PGP/MIME version"));
             return;
         }
         QCA::SecureMessage* msg = new QCA::SecureMessage(&m_pgp);
-        qDebug() << "foobar" << msg;
         connect(msg, SIGNAL(finished()), this, SLOT(decryptionFinished()));
         msg->setFormat(QCA::SecureMessage::Ascii);
         msg->startDecrypt();
@@ -84,6 +78,9 @@ void OpenPGPHelper::decryptionFinished()
     Q_ASSERT(msg);
 
     if (!msg->success()) {
+        emit decryptionFailed(qcaErrorStrings(msg->errorCode()));
+        qDebug() << "Decryption Failed:" << qcaErrorStrings(msg->errorCode())
+                    << msg->diagnosticText();
     } else {
         QByteArray message;
         while ( msg->bytesAvailable() )

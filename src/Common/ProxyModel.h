@@ -37,8 +37,8 @@ public:
     MessagePart(MessagePart *parent, int row);
     virtual ~MessagePart();
 
-    MessagePart* parent() { return m_parent; }
-    const int row() { return m_row; }
+    MessagePart* parent() const { return m_parent; }
+    const int row() const { return m_row; }
     virtual MessagePart* child(int row);
     virtual int rowCount() const = 0;
 
@@ -144,6 +144,9 @@ public:
     QVariant data(const QModelIndex &index, int role) const;
 
     QModelIndex message() { return m_message; }
+
+signals:
+    void decryptionFailed(const QString& error);
 
 private slots:
     void handlePartChanged();

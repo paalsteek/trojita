@@ -339,6 +339,7 @@ MessageModel::MessageModel(QObject *parent, const QModelIndex &message)
     , m_pgpHelper(new Cryptography::OpenPGPHelper(this))
     , m_smimeHelper(new Cryptography::SMIMEHelper(this))
 {
+    connect(m_pgpHelper, SIGNAL(decryptionFailed(QString)), this, SIGNAL(decryptionFailed(QString)));
 }
 
 MessageModel::~MessageModel()
@@ -351,7 +352,7 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
     if (!parent.isValid()) {
         part = nullptr;
         if (!m_rootPart) {
-            m_rootPart = new ProxyMessagePart(part, 0, m_message.child(0,0));
+            m_rootPart = new ProxyMessagePart(part, 0, m_message);
             connect(m_rootPart, SIGNAL(partChanged()), this, SLOT(handlePartChanged()));
         }
         child = m_rootPart;
