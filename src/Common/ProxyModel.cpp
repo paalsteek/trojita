@@ -46,6 +46,21 @@ MessagePart::~MessagePart()
 {
 }
 
+MessagePart* MessagePart::child(int row)
+{
+    if ( !children.contains(row) ) {
+        children.insert(row, newChild(row));
+    }
+    return children[row];
+}
+
+void MessagePart::replaceChild(int row, MessagePart *part)
+{
+    Q_ASSERT(children.contains(row));
+
+    children.insert(row, part);
+}
+
 ProxyMessagePart::ProxyMessagePart(MessagePart *parent, int row, const QModelIndex& sourceIndex)
     : MessagePart(parent, row)
     , m_sourceIndex(sourceIndex)
@@ -57,13 +72,12 @@ ProxyMessagePart::~ProxyMessagePart()
 {
 }
 
-MessagePart* ProxyMessagePart::child(int row)
+MessagePart* ProxyMessagePart::newChild(int row)
 {
     if (row >= rowCount())
-        return 0;
+        return nullptr;
 
     ProxyMessagePart* child = new ProxyMessagePart(this, row, m_sourceIndex.child(row, 0));
-    connect(child, SIGNAL(partChanged()), this, SIGNAL(partChanged()));
     return child;
 }
 
@@ -92,13 +106,16 @@ LocalMessagePart::~LocalMessagePart()
 {
 }
 
-MessagePart* LocalMessagePart::child(int row)
+MessagePart* LocalMessagePart::newChild(int row)
 {
     Q_ASSERT(m_me);
+    if (row >= rowCount())
+        return nullptr;
 
     mimetic::MimeEntityList::iterator it = m_me->body().parts().begin();
     for (int i = 0; i < row; i++) { it++; }
-    return new LocalMessagePart(this, row, *it);
+    MessagePart* child = new LocalMessagePart(this, row, *it);
+    return child;
 }
 
 int LocalMessagePart::rowCount() const
@@ -295,6 +312,9 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
             Q_ASSERT(encPart);
             return createIndex(row, column, encPart->rawPart());
         }
+        if (row >= rowCount(parent)) {
+            return QModelIndex();
+        }
         child = part->child(row);
     }
 
@@ -305,13 +325,18 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
         EncryptedMessagePart* encPart = new EncryptedMessagePart(part, row, child);
         if (child == m_rootPart) {
             m_rootPart = encPart;
+        } else if (part) {
+            part->replaceChild(row, encPart);
         }
         connect(m_pgpHelper, SIGNAL(dataDecrypted(mimetic::MimeEntity*)), encPart, SLOT(handleDataDecrypted(mimetic::MimeEntity*)));
+        connect(encPart, SIGNAL(partChanged()), this, SLOT(handlePartChanged()));
         connect(encPart, SIGNAL(partDecrypted()), this, SLOT(handlePartDecrypted()));
         QModelIndex index = createIndex(row, column, encPart);
         m_pgpHelper->decrypt(index);
         return index;
     }
+
+    connect(child, SIGNAL(partChanged()), this, SLOT(handlePartChanged()));
 
     return createIndex(row, column, child);
 }
@@ -333,7 +358,9 @@ QModelIndex MessageModel::parent(const QModelIndex &child) const
 
 int MessageModel::rowCount(const QModelIndex &parent) const
 {
-    Q_ASSERT(parent.isValid());
+    if (!parent.isValid())
+        return !m_rootPart ? 0 : 1;
+
     MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
     Q_ASSERT(part);
     return part->rowCount();

@@ -39,16 +39,21 @@ public:
 
     MessagePart* parent() { return m_parent; }
     const int row() { return m_row; }
-    virtual MessagePart* child(int row) = 0;
+    virtual MessagePart* child(int row);
     virtual int rowCount() const = 0;
 
     virtual QVariant data(int role) = 0;
+
+    void replaceChild(int row, MessagePart* part);
 
 signals:
     void partChanged();
 
 private:
+    virtual MessagePart* newChild(int row) = 0;
+
     MessagePart *m_parent;
+    QHash<int, MessagePart*> children;
     int m_row;
 };
 
@@ -59,7 +64,7 @@ public:
     ProxyMessagePart(MessagePart *parent, int row, const QModelIndex &sourceIndex);
     ~ProxyMessagePart();
 
-    MessagePart* child(int row);
+    MessagePart* newChild(int row);
     int rowCount() const;
 
     QVariant data(int role) { return m_sourceIndex.data(role); }
@@ -76,7 +81,7 @@ public:
     LocalMessagePart(MessagePart *parent, int row, mimetic::MimeEntity* pMe);
     ~LocalMessagePart();
 
-    MessagePart* child(int row);
+    MessagePart* newChild(int row);
     int rowCount() const;
 
     QVariant data(int role);
@@ -128,7 +133,7 @@ public:
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
     QModelIndex parent(const QModelIndex &child) const;
     int rowCount(const QModelIndex &parent) const;
-    int columnCount(const QModelIndex &parent) const { return 0; }
+    int columnCount(const QModelIndex &parent) const { return !m_rootPart ? 0 : 1; }
     QVariant data(const QModelIndex &index, int role) const;
 
     QModelIndex message() { return m_message; }
