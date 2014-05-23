@@ -130,8 +130,8 @@ QString LocalMessagePart::mimetype() const
 {
     Q_ASSERT(m_me);
 
-    QString type = QString::fromStdString(m_me->header().contentType().type());
-    QString subtype = QString::fromStdString(m_me->header().contentType().subtype());
+    QString type = QString(m_me->header().contentType().type().c_str());
+    QString subtype = QString(m_me->header().contentType().subtype().c_str());
 
     return QString("%1/%2").arg(type, subtype);
 }
@@ -165,14 +165,17 @@ QString LocalMessagePart::protocol() const
 {
     Q_ASSERT(m_me);
 
-    return QString::fromStdString(m_me->header().contentType().param("protocol"));
+    return QString(m_me->header().contentType().param("protocol").c_str());
 }
 
 QString LocalMessagePart::filename() const
 {
     Q_ASSERT(m_me);
 
-    return QString::fromStdString(m_me->header().contentType().param("name"));
+    QString filename = QString(m_me->header().contentDisposition().param("filename").c_str());
+    if (filename.isEmpty())
+        filename = QString(m_me->header().contentType().param("name").c_str());
+    return filename;
 }
 
 QString LocalMessagePart::format() const
@@ -205,6 +208,49 @@ QByteArray LocalMessagePart::bodyDisposition() const
     return QByteArray::fromRawData(rawBodyDisposition.c_str(), rawBodyDisposition.size());
 }
 
+QByteArray LocalMessagePart::bodyFldId() const
+{
+    Q_ASSERT(m_me);
+
+    std::string rawBodyFldId = m_me->header().contentId().str();
+    return QByteArray::fromRawData(rawBodyFldId.c_str(), rawBodyFldId.size());
+}
+
+QByteArray LocalMessagePart::relatedMainCid() const
+{
+    Q_ASSERT(m_me);
+
+    std::string rawMainCid = m_me->header().contentType().param("start");
+    return QByteArray::fromRawData(rawMainCid.c_str(), rawMainCid.size());
+}
+
+QString LocalMessagePart::partId() const {
+    if (isTopLevelMultipart())
+        return QString();
+
+    QString id = QString::number(row() + 1);
+    if (parent() && !parent()->data(Imap::Mailbox::RolePartId).toString().isEmpty())
+        id = parent()->data(Imap::Mailbox::RolePartId).toString() + QChar('.') + id;
+
+    return id;
+}
+
+QString LocalMessagePart::pathToPart() const {
+    // This item is not directly fetcheable, so it does *not* make sense to ask for it.
+    // We cannot really assert at this point, though, because this function is published via the MVC interface.
+    //return QLatin1String("application-bug-dont-fetch-this");
+    // TODO: do we need some way to prevent fetching of local parts?
+    QString parentPath = QLatin1String("");
+    if (parent()) {
+        parentPath = parent()->data(Imap::Mailbox::RolePartPathToPart).toString();
+    }
+    return parentPath + QChar('/') + QString::number(row());
+}
+
+bool LocalMessagePart::isTopLevelMultipart() const {
+    return mimetype().startsWith("multipart/") && (!parent()->parent() || parent()->data(Imap::Mailbox::RolePartMimeType).toString().startsWith("message/"));
+}
+
 QVariant LocalMessagePart::data(int role)
 {
     if (role == Imap::Mailbox::RoleIsFetched) {
@@ -213,6 +259,19 @@ QVariant LocalMessagePart::data(int role)
 
     if (!m_me)
         return QVariant();
+
+    switch (role) {
+    case Qt::DisplayRole:
+        if (isTopLevelMultipart())
+            return QString("%1").arg(mimetype());
+        else
+            return QString("%1: %2").arg(partId(), mimetype());
+    case Qt::ToolTipRole:
+    {
+        mimetic::Body b = m_me->body();
+        return b.size() > 10000 ? tr("%1 bytes of data").arg(b.size()) : b.data();
+    }
+    }
 
     switch (role) {
     case Imap::Mailbox::RolePartData:
@@ -228,39 +287,31 @@ QVariant LocalMessagePart::data(int role)
     case Imap::Mailbox::RolePartEncoding:
         return transferEncoding();
     case Imap::Mailbox::RolePartBodyFldId:
-        Q_ASSERT(0); // TODO: implement this
-        break;
+        return bodyFldId();
     case Imap::Mailbox::RolePartBodyDisposition:
         return bodyDisposition();
     case Imap::Mailbox::RolePartFileName:
+        qDebug() << "filename" << filename();
         return filename();
     case Imap::Mailbox::RolePartOctets:
         return octets();
     case Imap::Mailbox::RolePartId:
-        // TODO: handling of TopLevelMultiparts (see TreeItemPart::partId())
-        return QString::number(row() + 1);
+        return partId();
     case Imap::Mailbox::RolePartPathToPart:
-    {
-        // This item is not directly fetcheable, so it does *not* make sense to ask for it.
-        // We cannot really assert at this point, though, because this function is published via the MVC interface.
-        //return QLatin1String("application-bug-dont-fetch-this");
-        // TODO: do we need some way to prevent fetching of local parts?
-        QString parentPath = QLatin1String("");
-        if (parent()) {
-            parentPath = parent()->data(Imap::Mailbox::RolePartPathToPart).toString();
-        }
-        qDebug() << "PathToPart:" << parentPath + QChar('/') + QString::number(row() + 1);
-        return parentPath + QChar('/') + QString::number(row() + 1);
-    }
+        return pathToPart();
     case Imap::Mailbox::RolePartMultipartRelatedMainCid:
-        Q_ASSERT(0); // TODO: implement this
-        break;
+        if (relatedMainCid().isEmpty()) {
+            return relatedMainCid();
+        } else {
+            return QVariant();
+        }
     case Imap::Mailbox::RolePartIsTopLevelMultipart:
-        return false; // TODO: check meaning of TopLevelMultipart
+        return isTopLevelMultipart();
     case Imap::Mailbox::RolePartForceFetchFromCache:
         return QVariant(); // Nothing to do here
     default:
-        Q_ASSERT(0); // unknown role
+        qDebug() << "Unknown Role requested:" << role << "(base:" << Imap::Mailbox::RoleBase << ")";
+        //Q_ASSERT(0); // unknown role
         break;
     }
 

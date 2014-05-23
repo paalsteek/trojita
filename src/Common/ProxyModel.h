@@ -88,15 +88,22 @@ public:
 
 private:
     QString mimetype() const;
-    QByteArray data() const;
     int octets() const;
     QString charset() const;
     QString protocol() const;
     QString filename() const;
     QString format() const;
     QString delsp() const;
+    QByteArray data() const;
     QByteArray transferEncoding() const;
     QByteArray bodyDisposition() const;
+    QByteArray bodyFldId() const;
+    QByteArray relatedMainCid() const;
+
+    QString partId() const;
+    QString pathToPart() const;
+
+    bool isTopLevelMultipart() const;
 
 protected:
     mimetic::MimeEntity *m_me;
