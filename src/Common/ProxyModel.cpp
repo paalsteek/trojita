@@ -319,7 +319,7 @@ QVariant LocalMessagePart::data(int role)
 }
 
 EncryptedMessagePart::EncryptedMessagePart(MessagePart *parent, int row, MessagePart *raw)
-    : LocalMessagePart(parent, row, NULL)
+    : LocalMessagePart(parent, row, nullptr)
     , m_raw(raw)
 {
 }
@@ -335,7 +335,7 @@ void EncryptedMessagePart::handleDataDecrypted(mimetic::MimeEntity *pMe)
 MessageModel::MessageModel(QObject *parent, const QModelIndex &message)
     : QAbstractItemModel(parent)
     , m_message(message)
-    , m_rootPart(0)
+    , m_rootPart(nullptr)
     , m_pgpHelper(new Cryptography::OpenPGPHelper(this))
     , m_smimeHelper(new Cryptography::SMIMEHelper(this))
 {
@@ -349,7 +349,7 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
 {
     MessagePart *part, *child;
     if (!parent.isValid()) {
-        part = 0;
+        part = nullptr;
         if (!m_rootPart) {
             m_rootPart = new ProxyMessagePart(part, 0, m_message.child(0,0));
             connect(m_rootPart, SIGNAL(partChanged()), this, SLOT(handlePartChanged()));
