@@ -24,7 +24,9 @@
 #include "Imap/Encoders.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/Model.h"
+#include "Imap/Parser/Message.h"
 #include <QDebug>
+#include <QDateTime>
 
 #include "Cryptography/OpenPGPHelper.h"
 #include "Cryptography/SMIMEHelper.h"
@@ -141,7 +143,14 @@ QByteArray LocalMessagePart::data() const
     Q_ASSERT(m_me);
 
     QByteArray rawData = QByteArray::fromRawData(m_me->body().data(), m_me->body().size());
-    qDebug() << "raw partData:" << rawData;
+    if (!m_me->body().parts().empty()) {
+        std::stringstream ss;
+        for(mimetic::MimeEntityList::iterator it = m_me->body().parts().begin(), end = m_me->body().parts().end(); it != end; it++)
+        {
+            ss << **it;
+        }
+        rawData = QByteArray::fromRawData(ss.str().c_str(), ss.str().length());
+    }
     QByteArray data;
     Imap::decodeContentTransferEncoding(rawData, transferEncoding(), &data);
     return data;
@@ -173,6 +182,12 @@ QString LocalMessagePart::filename() const
     Q_ASSERT(m_me);
 
     QString filename = QString(m_me->header().contentDisposition().param("filename").c_str());
+    if (filename.isEmpty()) {
+        std::string rawstr = m_me->header().contentDisposition().param("filename*");
+        QByteArray raw = QByteArray::fromRawData(rawstr.c_str(), rawstr.length());
+
+        filename = Imap::decodeRFC2231String(raw);
+    }
     if (filename.isEmpty())
         filename = QString(m_me->header().contentType().param("name").c_str());
     return filename;
@@ -251,6 +266,45 @@ bool LocalMessagePart::isTopLevelMultipart() const {
     return mimetype().startsWith("multipart/") && (!parent()->parent() || parent()->data(Imap::Mailbox::RolePartMimeType).toString().startsWith("message/"));
 }
 
+QList<Imap::Message::MailAddress> mailboxListToQList(const mimetic::MailboxList& list) {
+    QList<Imap::Message::MailAddress> result;
+    Q_FOREACH(mimetic::Mailbox addr, list)
+    {
+        result.append(Imap::Message::MailAddress(
+                        QString::fromStdString(addr.label()),
+                        QString::fromStdString(addr.sourceroute()),
+                        QString::fromStdString(addr.mailbox()),
+                        QString::fromStdString(addr.domain())));
+    }
+    return result;
+}
+
+QList<Imap::Message::MailAddress> addressListToQList(const mimetic::AddressList& list) {
+    QList<Imap::Message::MailAddress> result;
+    Q_FOREACH(mimetic::Address addr, list)
+    {
+        if (addr.isGroup()) {
+            mimetic::Group group = addr.group();
+            for (mimetic::Group::iterator it = group.begin(), end = group.end(); it != end; it++) {
+                mimetic::Mailbox mb = *it;
+                result.append(Imap::Message::MailAddress(
+                                  QString::fromStdString(mb.label()),
+                                  QString::fromStdString(mb.sourceroute()),
+                                  QString::fromStdString(mb.mailbox()),
+                                  QString::fromStdString(mb.domain())));
+            }
+        } else {
+            mimetic::Mailbox mb = addr.mailbox();
+            result.append(Imap::Message::MailAddress(
+                              QString::fromStdString(mb.label()),
+                              QString::fromStdString(mb.sourceroute()),
+                              QString::fromStdString(mb.mailbox()),
+                              QString::fromStdString(mb.domain())));
+        }
+    }
+    return result;
+}
+
 QVariant LocalMessagePart::data(int role)
 {
     if (role == Imap::Mailbox::RoleIsFetched) {
@@ -273,7 +327,37 @@ QVariant LocalMessagePart::data(int role)
     }
     }
 
+    if (mimetype().toLower() == QLatin1String("message/rfc822")) {
+        switch (role) {
+        case Imap::Mailbox::RoleMessageEnvelope:
+            mimetic::Header h = (*(m_me->body().parts().begin()))->header();
+            QDateTime date = QDateTime::fromString(QString::fromStdString(h.field("date").value()));
+            QString subject = QString::fromStdString(h.subject());
+            QList<Imap::Message::MailAddress> from, sender, replyTo, to, cc, bcc;
+            from = mailboxListToQList(h.from());
+            if (h.hasField("sender")) {
+                sender.append(Imap::Message::MailAddress(
+                                  QString::fromStdString(h.sender().label()),
+                                  QString::fromStdString(h.sender().sourceroute()),
+                                  QString::fromStdString(h.sender().mailbox()),
+                                  QString::fromStdString(h.sender().domain())));
+            }
+            replyTo = addressListToQList(h.replyto());
+            to = addressListToQList(h.to());
+            cc = addressListToQList(h.cc());
+            bcc = addressListToQList(h.bcc());
+            QList<QByteArray> inReplyTo;
+            if (h.hasField("In-Reply-To")) {
+                inReplyTo.append(QByteArray(h.field("In-Reply-To").value().c_str(), h.field("In-Reply-To").value().length()));
+            }
+            QByteArray messageId = QByteArray::fromRawData(h.messageid().str().c_str(), h.messageid().str().length());
+            return QVariant::fromValue<Imap::Message::Envelope>(Imap::Message::Envelope(date, subject, from, sender, replyTo, to, cc, bcc, inReplyTo, messageId));
+        }
+    }
+
     switch (role) {
+    case Imap::Mailbox::RoleIsUnavailable:
+        return false;
     case Imap::Mailbox::RolePartData:
         return data();
     case Imap::Mailbox::RolePartMimeType:
@@ -291,7 +375,6 @@ QVariant LocalMessagePart::data(int role)
     case Imap::Mailbox::RolePartBodyDisposition:
         return bodyDisposition();
     case Imap::Mailbox::RolePartFileName:
-        qDebug() << "filename" << filename();
         return filename();
     case Imap::Mailbox::RolePartOctets:
         return octets();
