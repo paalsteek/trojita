@@ -47,6 +47,8 @@ QByteArray encodeRFC2047Phrase(const QString &text);
 QByteArray encodeRFC2047StringWithAsciiPrefix(const QString &text);
 QString decodeRFC2047String(const QByteArray &raw);
 
+QString decodeRFC2231String(const QByteArray &raw);
+
 QByteArray encodeImapFolderName(const QString &text);
 
 QString decodeImapFolderName(const QByteArray &raw);
