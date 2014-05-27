@@ -417,7 +417,17 @@ QString decodeRFC2047String( const QByteArray& raw )
     return ::decodeWordSequence( raw );
 }
 
-QByteArray encodeImapFolderName(const QString &text)
+QString decodeRFC2231String(const QByteArray &raw)
+{
+    int pos1 = raw.indexOf('\'', 0);
+    int pos2 = raw.indexOf('\'', qMax(1, pos1 + 1));
+    if (pos1 != -1 && pos2 != -1) {
+        return decodeByteArray(translatePercentToBin(raw.mid(pos2 + 1)), raw.left(pos1));
+    }
+    return QString();
+}
+
+QByteArray encodeImapFolderName( const QString& text )
 {
     return KIMAP::encodeImapFolderName(text);
 }
@@ -565,12 +575,9 @@ QString extractRfc2231Param(const QMap<QByteArray, QByteArray> &parameters, cons
         } while (it != parameters.constEnd());
     }
 
-    // Process 2231-style language/charset continuation, if present
-    int pos1 = raw.indexOf('\'', 0);
-    int pos2 = raw.indexOf('\'', qMax(1, pos1 + 1));
-    if (pos1 != -1 && pos2 != -1) {
-        return decodeByteArray(translatePercentToBin(raw.mid(pos2 + 1)), raw.left(pos1));
-    }
+    QString rfc2231string = decodeRFC2231String(raw);
+    if (!rfc2231string.isEmpty())
+        return rfc2231string;
 
     // Fallback: it could be empty, or otherwise malformed. Just treat it as UTF-8 for compatibility
     return QString::fromUtf8(raw);
