@@ -24,6 +24,7 @@
 #define CRYPTOGRAPHY_SMIMEHELPER_H_
 
 #include <QtCrypto/QtCrypto>
+#include <QModelIndex>
 
 namespace Cryptography {
     class SMIMEHelper : public QObject {
