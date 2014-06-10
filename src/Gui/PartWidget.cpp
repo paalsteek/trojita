@@ -202,7 +202,6 @@ GenericMultipartWidget::GenericMultipartWidget(QWidget *parent,
   , m_recursionDepth(recursionDepth)
   , m_loadingOptions(options)
 {
-    qDebug() << "GenericMultipartWidget:" << partIndex;
     connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
     setContentsMargins(0, 0, 0, 0);
     // multipart/mixed or anything else, as mandated by RFC 2046, Section 5.1.3

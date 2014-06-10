@@ -23,13 +23,15 @@
 #ifndef CRYPTOGRAPHY_OPENPGPHELPER_H_
 #define CRYPTOGRAPHY_OPENPGPHELPER_H_
 
-#include <QtCrypto/QtCrypto>
-
-//#ifdef TROJITA_HAVE_MIMETIC
-#include <mimetic/mimetic.h>
-//#endif // TROJITA_HAVE_MIMETIC
-
 #include "Imap/Model/Model.h"
+
+namespace mimetic {
+class MimeEntity;
+}
+
+namespace QCA {
+class OpenPGP;
+}
 
 namespace Cryptography {
 
@@ -38,7 +40,7 @@ namespace Cryptography {
 
     public:
         OpenPGPHelper(QObject* parent);
-        ~OpenPGPHelper() {}
+        ~OpenPGPHelper();
         void decrypt(const QModelIndex& parent);
 
     signals:
@@ -51,22 +53,9 @@ namespace Cryptography {
 
     private:
         QModelIndex m_partIndex;
-        QCA::OpenPGP m_pgp;
+        QCA::OpenPGP *m_pgp;
 
-        static QString qcaErrorStrings(int e) {
-            QMap<int, QString> map;
-            map[QCA::SecureMessage::ErrorPassphrase] =	tr("passphrase was either wrong or not provided");
-            map[QCA::SecureMessage::ErrorFormat] = tr("input format was bad");
-            map[QCA::SecureMessage::ErrorSignerExpired] = tr("signing key is expired");
-            map[QCA::SecureMessage::ErrorSignerInvalid] = tr("signing key is invalid in some way");
-            map[QCA::SecureMessage::ErrorEncryptExpired] = tr("encrypting key is expired");
-            map[QCA::SecureMessage::ErrorEncryptUntrusted] = tr("encrypting key is untrusted");
-            map[QCA::SecureMessage::ErrorEncryptInvalid] = tr("encrypting key is invalid in some way");
-            map[QCA::SecureMessage::ErrorNeedCard] = tr("pgp card is missing");
-            map[QCA::SecureMessage::ErrorCertKeyMismatch] = tr("certificate and private key don't match");
-            map[QCA::SecureMessage::ErrorUnknown] = tr("other error");
-            return map[e];
-        }
+        static QString qcaErrorStrings(int e);
     };
 }
 

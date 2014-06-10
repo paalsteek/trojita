@@ -31,11 +31,15 @@
 #include "Cryptography/OpenPGPHelper.h"
 #include "Cryptography/SMIMEHelper.h"
 
+#ifdef TROJITA_HAVE_QCA
+#include <QtCrypto/QtCrypto>
+#endif /* TROJITA_HAVE_QCA */
+
 namespace Common {
 
-//#ifdef TROJITA_HAVE_GNUPG
+#ifdef TROJITA_HAVE_QCA
 QCA::Initializer init;
-//#endif // TROJITA_HAVE_GNUPG
+#endif /* TROJITA_HAVE_QCA */
 
 MessagePart::MessagePart(MessagePart *parent, int row)
     : QObject()
@@ -98,6 +102,7 @@ void ProxyMessagePart::handleSourceDataChanged(const QModelIndex& topLeft, const
     }
 }
 
+#ifdef TROJITA_HAVE_MIMETIC
 LocalMessagePart::LocalMessagePart(MessagePart *parent, int row, mimetic::MimeEntity *pMe)
     : MessagePart(parent, row)
     , m_me(pMe)
@@ -414,6 +419,7 @@ void EncryptedMessagePart::handleDataDecrypted(mimetic::MimeEntity *pMe)
     emit partDecrypted();
     emit partChanged();
 }
+#endif /* TROJITA_HAVE_MIMETIC */
 
 MessageModel::MessageModel(QObject *parent, const QModelIndex &message)
     : QAbstractItemModel(parent)
@@ -442,11 +448,13 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
     } else {
         part = static_cast<MessagePart*>(parent.internalPointer());
         Q_ASSERT(part);
+#ifdef TROJITA_HAVE_MIMETIC
         if (column != 0) {
             EncryptedMessagePart* encPart = qobject_cast<EncryptedMessagePart*>(part);
             Q_ASSERT(encPart);
             return createIndex(row, column, encPart->rawPart());
         }
+#endif /* TROJITA_HAVE_MIMETIC */
         if (row >= rowCount(parent)) {
             return QModelIndex();
         }
@@ -456,6 +464,7 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
     if (!child)
         return QModelIndex();
 
+#ifdef TROJITA_HAVE_MIMETIC
     if (child->data(Imap::Mailbox::RolePartMimeType).toString().toLower() == QLatin1String("multipart/encrypted")) {
         EncryptedMessagePart* encPart = new EncryptedMessagePart(part, row, child);
         if (child == m_rootPart) {
@@ -470,6 +479,7 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
         m_pgpHelper->decrypt(index);
         return index;
     }
+#endif /* TROJITA_HAVE_MIMETIC */
 
     connect(child, SIGNAL(partChanged()), this, SLOT(handlePartChanged()));
 

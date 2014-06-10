@@ -4,9 +4,6 @@
 #  QCA2_INCLUDE_DIRS - The QCA2 include directories
 #  QCA2_LIBRARIES - The libraries needed to use QCA2
 #  QCA2_DEFINITIONS - Compiler switches required for using QCA2
-# Additional definitions (not yet implemented)
-#  QCA2_GNUPG_FOUND - System has GnuPG support of QCA2
-#  QCA2_GNUPG_LIBRARIES - The libraries needed for GnuPG support of QCA2
 
 find_package(PkgConfig)
 if (WITH_QT5)
@@ -27,11 +24,7 @@ else ()
 		     HINTS ${PC_QCA2_LIBDIR} ${PC_QCA2_LIBRARY_DIRS} )
 endif ()
 
-#find_library(QCA2_GNUPG_LIBRARY NAMES qca-gnupg libqca-gnupg
-#             HINTS ${PC_QCA2_LIBDIR} ${PC_QCA2_LIBRARY_DIRS} )
-
 set(QCA2_LIBRARIES ${QCA2_LIBRARY} )
-#set(QCA2_GNUPG_LIBRARIES ${QCA2_GNUPG_LIBRARIES} )
 set(QCA2_INCLUDE_DIRS ${QCA2_INCLUDE_DIR} )
 
 include(FindPackageHandleStandardArgs)
@@ -39,7 +32,5 @@ include(FindPackageHandleStandardArgs)
 # if all listed variables are TRUE
 find_package_handle_standard_args(QCA2  DEFAULT_MSG
                                   QCA2_LIBRARY QCA2_INCLUDE_DIR)
-#find_package_handle_standard_args(QCA2_GNUPG  DEFAULT_MSG
-#                                  QCA2_GNUPG_LIBRARY QCA2_INCLUDE_DIR)
 
 mark_as_advanced(QCA2_INCLUDE_DIR QCA2_LIBRARY )

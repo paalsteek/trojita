@@ -22,12 +22,23 @@
 
 #include "SMIMEHelper.h"
 
+#include "configure.cmake.h"
+
+#ifdef TROJITA_HAVE_QCA
+#include <QtCrypto/QtCrypto>
+#endif /* TROJITA_HAVE_QCA */
+
 namespace Cryptography {
 SMIMEHelper::SMIMEHelper(QObject *parent)
     : QObject(parent)
-    , m_cms()
+#ifdef TROJITA_HAVE_QCA
+    , m_cms(new QCA::CMS(this))
+#endif /* TROJITA_HAVE_QCA */
 {
+}
 
+SMIMEHelper::~SMIMEHelper()
+{
 }
 
 }

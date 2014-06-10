@@ -24,9 +24,19 @@
 #define COMMON_MODEL_H
 
 #include <QHash>
+#include <QObject>
+#include <QPersistentModelIndex>
 
-#include "Cryptography/OpenPGPHelper.h"
-#include "Cryptography/SMIMEHelper.h"
+#include "configure.cmake.h"
+
+#ifdef TROJITA_HAVE_MIMETIC
+#include <mimetic/mimetic.h>
+#endif /* TROJITA_HAVE_MIMETIC */
+
+namespace Cryptography {
+class OpenPGPHelper;
+class SMIMEHelper;
+}
 
 namespace Common {
 
@@ -76,6 +86,7 @@ private:
     QPersistentModelIndex m_sourceIndex;
 };
 
+#ifdef TROJITA_HAVE_MIMETIC
 class LocalMessagePart : public MessagePart {
 public:
     LocalMessagePart(MessagePart *parent, int row, mimetic::MimeEntity* pMe);
@@ -128,6 +139,7 @@ public slots:
 protected:
     MessagePart* m_raw;
 };
+#endif /* TROJITA_HAVE_MIMETIC */
 
 class MessageModel: public QAbstractItemModel
 {

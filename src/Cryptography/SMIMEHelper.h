@@ -23,8 +23,11 @@
 #ifndef CRYPTOGRAPHY_SMIMEHELPER_H_
 #define CRYPTOGRAPHY_SMIMEHELPER_H_
 
-#include <QtCrypto/QtCrypto>
 #include <QModelIndex>
+
+namespace QCA {
+class CMS;
+}
 
 namespace Cryptography {
     class SMIMEHelper : public QObject {
@@ -32,11 +35,11 @@ namespace Cryptography {
 
     public:
         SMIMEHelper(QObject* parent);
-        ~SMIMEHelper() {}
+        ~SMIMEHelper();
 
         void decrypt(const QModelIndex& parent) {}
     private:
-        QCA::CMS m_cms;
+        QCA::CMS *m_cms;
     };
 }
 
