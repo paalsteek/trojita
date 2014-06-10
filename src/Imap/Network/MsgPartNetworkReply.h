@@ -51,6 +51,7 @@ private:
     void disconnectBufferIfVanished() const;
 
     QPersistentModelIndex part;
+    QByteArray bufferData;
     mutable QBuffer buffer;
 
     MsgPartNetworkReply(const MsgPartNetworkReply &); // don't implement
