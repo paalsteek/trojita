@@ -130,8 +130,6 @@ private:
     QSettings *m_settings;
     QSet<QWebView*> m_loadingItems;
 
-    QMutex m_sync;
-
     MessageView(const MessageView &); // don't implement
     MessageView &operator=(const MessageView &); // don't implement
 };

@@ -389,9 +389,6 @@ void MessageView::handleMessageAvailable()
     Q_ASSERT(messageModel);
     QModelIndex rootPartIndex = messageModel->index(0,0);
     if (viewer == emptyView && rootPartIndex.child(0,0).isValid()) {
-        if ( !m_sync.tryLock() )
-            return;
-
         emptyView->hide();
         layout->removeWidget(viewer);
         if (viewer != emptyView) {
@@ -415,7 +412,6 @@ void MessageView::handleMessageAvailable()
         viewer->setParent(this);
         layout->addWidget(viewer);
         viewer->show();
-        m_sync.unlock();
         m_envelope->setMessage(message);
 
         tags->show();

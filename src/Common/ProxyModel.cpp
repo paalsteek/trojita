@@ -51,8 +51,8 @@ MessagePart::MessagePart(MessagePart *parent, int row)
     , m_row(row)
 {
     //TODO: singleton for messagepartfactory?
-    connect(this, SIGNAL(needChild(int,int)), m_factory, SLOT(createPart(int,int)));
-    connect(m_factory, SIGNAL(newPart(int,int,MessagePart*)), this, SLOT(addChild(int,int,MessagePart*)));
+    connect(this, SIGNAL(needChild(int,int)), m_factory, SLOT(createPart(int,int)), Qt::QueuedConnection);
+    connect(m_factory, SIGNAL(newPart(int,int,MessagePart*)), this, SLOT(addChild(int,int,MessagePart*)), Qt::QueuedConnection);
 }
 
 MessagePart::~MessagePart()
