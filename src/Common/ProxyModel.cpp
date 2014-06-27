@@ -20,6 +20,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "MessagePartFactory.h"
 #include "ProxyModel.h"
 #include "Imap/Encoders.h"
 #include "Imap/Model/ItemRoles.h"
@@ -41,11 +42,17 @@ namespace Common {
 QCA::Initializer init;
 #endif /* TROJITA_HAVE_QCA */
 
+//TODO: handling of special columns
+
 MessagePart::MessagePart(MessagePart *parent, int row)
     : QObject()
     , m_parent(parent)
+    , m_factory(new MessagePartFactory())
     , m_row(row)
 {
+    //TODO: singleton for messagepartfactory?
+    connect(this, SIGNAL(needChild(int,int)), m_factory, SLOT(createPart(int,int)));
+    connect(m_factory, SIGNAL(newPart(int,int,MessagePart*)), this, SLOT(addChild(int,int,MessagePart*)));
 }
 
 MessagePart::~MessagePart()
@@ -54,17 +61,28 @@ MessagePart::~MessagePart()
 
 MessagePart* MessagePart::child(int row)
 {
-    if ( !children.contains(row) ) {
-        children.insert(row, newChild(row));
+    if ( !m_children.contains(row) ) {
+        emit needChild(row, 0);
+        return nullptr;
     }
-    return children[row];
+    return m_children[row];
 }
 
 void MessagePart::replaceChild(int row, MessagePart *part)
 {
-    Q_ASSERT(children.contains(row));
+    Q_ASSERT(m_children.contains(row));
 
-    children.insert(row, part);
+    m_children.insert(row, part);
+}
+
+void MessagePart::addChild(int row, int column, MessagePart *part)
+{
+    Q_UNUSED(column);
+    if (m_children.contains(row))
+        return;
+    emit aboutToBeInserted(row, 1);
+    m_children.insert(row, part);
+    emit endInsert();
 }
 
 ProxyMessagePart::ProxyMessagePart(MessagePart *parent, int row, const QModelIndex& sourceIndex)
@@ -437,51 +455,24 @@ MessageModel::~MessageModel()
 
 QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) const
 {
-    MessagePart *part, *child;
+    MessagePart* child;
     if (!parent.isValid()) {
-        part = nullptr;
         if (!m_rootPart) {
-            m_rootPart = new ProxyMessagePart(part, 0, m_message);
-            connect(m_rootPart, SIGNAL(partChanged()), this, SLOT(handlePartChanged()));
+            m_rootPart = new ProxyMessagePart(nullptr, 0, m_message);
         }
         child = m_rootPart;
     } else {
-        part = static_cast<MessagePart*>(parent.internalPointer());
+        MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
         Q_ASSERT(part);
-#ifdef TROJITA_HAVE_MIMETIC
-        if (column != 0) {
-            EncryptedMessagePart* encPart = qobject_cast<EncryptedMessagePart*>(part);
-            Q_ASSERT(encPart);
-            return createIndex(row, column, encPart->rawPart());
-        }
-#endif /* TROJITA_HAVE_MIMETIC */
-        if (row >= rowCount(parent)) {
-            return QModelIndex();
-        }
         child = part->child(row);
     }
 
     if (!child)
         return QModelIndex();
 
-#ifdef TROJITA_HAVE_MIMETIC
-    if (child->data(Imap::Mailbox::RolePartMimeType).toString().toLower() == QLatin1String("multipart/encrypted")) {
-        EncryptedMessagePart* encPart = new EncryptedMessagePart(part, row, child);
-        if (child == m_rootPart) {
-            m_rootPart = encPart;
-        } else if (part) {
-            part->replaceChild(row, encPart);
-        }
-        connect(m_pgpHelper, SIGNAL(dataDecrypted(mimetic::MimeEntity*)), encPart, SLOT(handleDataDecrypted(mimetic::MimeEntity*)));
-        connect(encPart, SIGNAL(partChanged()), this, SLOT(handlePartChanged()));
-        connect(encPart, SIGNAL(partDecrypted()), this, SLOT(handlePartDecrypted()));
-        QModelIndex index = createIndex(row, column, encPart);
-        m_pgpHelper->decrypt(index);
-        return index;
-    }
-#endif /* TROJITA_HAVE_MIMETIC */
-
-    connect(child, SIGNAL(partChanged()), this, SLOT(handlePartChanged()));
+    connect(child, SIGNAL(partChanged()), this, SLOT(handlePartChanged()), Qt::UniqueConnection);
+    connect(child, SIGNAL(aboutToBeInserted(int,int)), this, SLOT(handleAboutToBeInserted(int,int)), Qt::UniqueConnection);
+    connect(child, SIGNAL(endInsert()), this, SLOT(handleEndInsert()), Qt::UniqueConnection);
 
     return createIndex(row, column, child);
 }
@@ -526,6 +517,19 @@ void MessageModel::handlePartChanged()
     MessagePart* part = qobject_cast<MessagePart*>(sender());
     QModelIndex index = createIndex(part->row(), 0, part);
     emit dataChanged(index, index);
+}
+
+void MessageModel::handleAboutToBeInserted(int row, int count)
+{
+    MessagePart* part = qobject_cast<MessagePart*>(sender());
+    QModelIndex index = createIndex(part->row(), 0, part);
+    beginInsertRows(index, row, count);
+}
+
+void MessageModel::handleEndInsert()
+{
+    qDebug() << "MessageModel::handleEndInsert()";
+    endInsertRows();
 }
 
 void MessageModel::handlePartDecrypted()

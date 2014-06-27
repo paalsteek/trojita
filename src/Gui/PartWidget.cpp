@@ -56,23 +56,45 @@ QString quoteMeHelper(const QObjectList &children)
     return res.join(QLatin1String("\n"));
 }
 
+AbstractMultipartWidget::AbstractMultipartWidget(PartWidgetFactory *factory, const QModelIndex &partIndex,
+         const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options)
+    : m_factory(factory)
+    , m_partIndex(partIndex)
+    , m_recursionDepth(recursionDepth)
+    , m_loadingOptions(options)
+{
+
+}
+
 MultipartAlternativeWidget::MultipartAlternativeWidget(QWidget *parent,
         PartWidgetFactory *factory, const QModelIndex &partIndex,
         const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options):
-    QTabWidget(parent)
+    QTabWidget(parent),
+    AbstractMultipartWidget(factory, partIndex, recursionDepth, options)
 {
+    connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
     setContentsMargins(0,0,0,0);
 
-    const bool plaintextIsPreferred = options & PartWidgetFactory::PART_PREFER_PLAINTEXT_OVER_HTML;
+    rebuildWidgets();
+}
+
+void MultipartAlternativeWidget::rebuildWidgets()
+{
+    // TODO: clean up existing layouts
+
+    const bool plaintextIsPreferred = m_loadingOptions & PartWidgetFactory::PART_PREFER_PLAINTEXT_OVER_HTML;
 
     // Which "textual, boring part" should be shown?
     int preferredTextIndex = -1;
 
     // First loop iteration is used to find out what MIME type to show.
     // Two iterations are needed because we have to know about whether we're shown or hidden when creating child widgets.
-    for (int i = 0; i < partIndex.model()->rowCount(partIndex); ++i) {
-        QModelIndex anotherPart = partIndex.child(i, 0);
-        Q_ASSERT(anotherPart.isValid());
+    for (int i = 0; i < m_partIndex.model()->rowCount(m_partIndex); ++i) {
+        QModelIndex anotherPart = m_partIndex.child(i, 0);
+        // we need all children to be available to find the right one to display
+        if (!anotherPart.isValid()) {
+            return;
+        }
 
         QString mimeType = anotherPart.data(Imap::Mailbox::RolePartMimeType).toString();
 
@@ -90,19 +112,19 @@ MultipartAlternativeWidget::MultipartAlternativeWidget(QWidget *parent,
     // Show that part which is "the most important". The choice is usually between text/plain and text/html, one of them will win,
     // depending on the user's preferences.  If there are additional parts, the user will be alerted about them later on.
     // As usual, the later parts win in general.
-    int preferredIndex = preferredTextIndex == -1 ? partIndex.model()->rowCount(partIndex) - 1 : preferredTextIndex;
+    int preferredIndex = preferredTextIndex == -1 ? m_partIndex.model()->rowCount(m_partIndex) - 1 : preferredTextIndex;
 
     // The second loop actually creates the widgets
-    for (int i = 0; i < partIndex.model()->rowCount(partIndex); ++i) {
-        QModelIndex anotherPart = partIndex.child(i, 0);
+    for (int i = 0; i < m_partIndex.model()->rowCount(m_partIndex); ++i) {
+        QModelIndex anotherPart = m_partIndex.child(i, 0);
         Q_ASSERT(anotherPart.isValid());
         // TODO: This is actually not perfect, the preferred part of a multipart/alternative
         // which is nested as a non-preferred part of another multipart/alternative actually gets loaded here.
         // I can live with that.
-        QWidget *item = factory->create(anotherPart, recursionDepth + 1,
+        QWidget *item = m_factory->create(anotherPart, m_recursionDepth + 1,
                                         filteredForEmbedding(i == preferredIndex ?
-                                            options :
-                                            options | PartWidgetFactory::PART_IS_HIDDEN));
+                                            m_loadingOptions :
+                                            m_loadingOptions | PartWidgetFactory::PART_IS_HIDDEN));
         QString mimeType = anotherPart.data(Imap::Mailbox::RolePartMimeType).toString();
 
         const bool isPlainText = mimeType == QLatin1String("text/plain");
@@ -164,27 +186,41 @@ bool MultipartAlternativeWidget::eventFilter(QObject *o, QEvent *e)
 MultipartSignedWidget::MultipartSignedWidget(QWidget *parent,
         PartWidgetFactory *factory, const QModelIndex &partIndex,
         const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options):
-    QGroupBox(tr("Signed Message"), parent)
+    QGroupBox(tr("Signed Message"), parent),
+    AbstractMultipartWidget(factory, partIndex, recursionDepth, options)
 {
+    connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
     setFlat(true);
+    rebuildWidgets();
+}
+
+void MultipartSignedWidget::rebuildWidgets()
+{
+    QLayout *l = layout();
+    delete l;
+
     using namespace Imap::Mailbox;
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setSpacing(0);
-    uint childrenCount = partIndex.model()->rowCount(partIndex);
+    uint childrenCount = m_partIndex.model()->rowCount(m_partIndex);
     if (childrenCount == 1) {
         setTitle(tr("Malformed multipart/signed message: only one nested part"));
-        QModelIndex anotherPart = partIndex.child(0, 0);
-        Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, filteredForEmbedding(options)));
+        QModelIndex anotherPart = m_partIndex.child(0, 0);
+        if (!anotherPart.isValid()) {
+            return;
+        }
+        layout->addWidget(m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions)));
     } else if (childrenCount != 2) {
         QLabel *lbl = new QLabel(tr("Malformed multipart/signed message: %1 nested parts").arg(QString::number(childrenCount)), this);
         layout->addWidget(lbl);
         return;
     } else {
         Q_ASSERT(childrenCount == 2); // from the if logic; FIXME: refactor
-        QModelIndex anotherPart = partIndex.child(0, 0);
-        Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        layout->addWidget(factory->create(anotherPart, recursionDepth + 1, filteredForEmbedding(options)));
+        QModelIndex anotherPart = m_partIndex.child(0, 0);
+        if (!anotherPart.isValid()) {
+            return;
+        }
+        layout->addWidget(m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions)));
     }
 }
 
@@ -197,21 +233,28 @@ GenericMultipartWidget::GenericMultipartWidget(QWidget *parent,
         PartWidgetFactory *factory, const QModelIndex &partIndex,
         int recursionDepth, const PartWidgetFactory::PartLoadingOptions options):
     QWidget(parent)
-  , m_partIndex(partIndex)
-  , m_factory(factory)
-  , m_recursionDepth(recursionDepth)
-  , m_loadingOptions(options)
+  , AbstractMultipartWidget(factory, partIndex, recursionDepth, options)
 {
     connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
     setContentsMargins(0, 0, 0, 0);
+
+    rebuildWidgets();
+}
+
+void GenericMultipartWidget::rebuildWidgets()
+{
+    QLayout *l = layout();
+    delete l;
     // multipart/mixed or anything else, as mandated by RFC 2046, Section 5.1.3
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setSpacing(0);
-    for (int i = 0; i < partIndex.model()->rowCount(partIndex); ++i) {
+    for (int i = 0; i < m_partIndex.model()->rowCount(m_partIndex); ++i) {
         using namespace Imap::Mailbox;
-        QModelIndex anotherPart = partIndex.child(i, 0);
-        Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        QWidget *res = factory->create(anotherPart, recursionDepth + 1, filteredForEmbedding(options));
+        QModelIndex anotherPart = m_partIndex.child(i, 0);
+        if (!anotherPart.isValid()) {
+            continue;
+        }
+        QWidget *res = m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions));
         layout->addWidget(res);
     }
 }
@@ -221,41 +264,35 @@ QString GenericMultipartWidget::quoteMe() const
     return quoteMeHelper(children());
 }
 
-void GenericMultipartWidget::handleRowsInserted(QModelIndex parent, int first, int last)
-{
-    qDebug() << "GenericMultipartWidget::handleRowsInserted(" << parent << "," << first << "," << last << ")";
-    if (parent == m_partIndex) {
-        qDebug() << "new data inserted in" << parent.data(Imap::Mailbox::RolePartMimeType);
-        QLayout *l = layout();
-        delete l;
-        QVBoxLayout *layout = new QVBoxLayout(this);
-        layout->setSpacing(0);
-        for (int i = 0; i < parent.model()->rowCount(parent); ++i) {
-            using namespace Imap::Mailbox;
-            QModelIndex anotherPart = parent.child(i, 0);
-            qDebug() << "Part" << i << ":" << anotherPart.data(Imap::Mailbox::RolePartMimeType);
-            Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-            QWidget *res = m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions));
-            layout->addWidget(res);
-        }
-    }
-}
-
 Message822Widget::Message822Widget(QWidget *parent,
                                    PartWidgetFactory *factory, const QModelIndex &partIndex,
                                    int recursionDepth, const PartWidgetFactory::PartLoadingOptions options):
-    QWidget(parent)
+    QWidget(parent),
+    AbstractMultipartWidget(factory, partIndex, recursionDepth, options)
 {
+    m_envelope = new EnvelopeView(0, m_factory->messageView());
+    m_envelope->setMessage(m_partIndex);
+
+    connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
+
+    rebuildWidgets();
+}
+
+void Message822Widget::rebuildWidgets()
+{
+    QLayout *l = layout();
+    delete l;
+
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setSpacing(0);
-    EnvelopeView *envelope = new EnvelopeView(0, factory->messageView());
-    envelope->setMessage(partIndex);
-    layout->addWidget(envelope);
-    for (int i = 0; i < partIndex.model()->rowCount(partIndex); ++i) {
+    layout->addWidget(m_envelope);
+    for (int i = 0; i < m_partIndex.model()->rowCount(m_partIndex); ++i) {
         using namespace Imap::Mailbox;
-        QModelIndex anotherPart = partIndex.child(i, 0);
-        Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        QWidget *res = factory->create(anotherPart, recursionDepth + 1, filteredForEmbedding(options));
+        QModelIndex anotherPart = m_partIndex.child(i, 0);
+        if (!anotherPart.isValid()) {
+            continue;
+        }
+        QWidget *res = m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions));
         layout->addWidget(res);
     }
 }
@@ -284,7 +321,21 @@ IMPL_RELOAD(Message822Widget);
 
 #undef IMPL_RELOAD
 
+#define IMPL_ROWSINSERTED(CLASS) void CLASS::handleRowsInserted(QModelIndex parent, int first, int last) \
+{\
+    /*qDebug() << metaObject()->className() << "::handleRowsInserted(" << parent << "," << first << "," << last << ")";*/\
+    if (parent == m_partIndex) {\
+        /*qDebug() << "new data inserted in" << parent.data(Imap::Mailbox::RolePartMimeType).toString();*/ \
+        rebuildWidgets();\
+    }\
+}
 
+IMPL_ROWSINSERTED(MultipartAlternativeWidget);
+IMPL_ROWSINSERTED(MultipartSignedWidget);
+IMPL_ROWSINSERTED(GenericMultipartWidget);
+IMPL_ROWSINSERTED(Message822Widget);
+
+#undef IMPL_ROWSINSERTED
 }
 
 

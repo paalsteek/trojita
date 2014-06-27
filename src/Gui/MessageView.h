@@ -22,11 +22,13 @@
 #ifndef VIEW_MESSAGEVIEW_H
 #define VIEW_MESSAGEVIEW_H
 
+#include <QMutex>
 #include <QPersistentModelIndex>
 #include <QPointer>
 #include <QSet>
 #include <QWidget>
 #include "Composer/Recipients.h"
+
 
 class QBoxLayout;
 class QLabel;
@@ -91,8 +93,6 @@ private slots:
     void externalsEnabled();
     void newLabelAction(const QString &tag);
     void deleteLabelAction(const QString &tag);
-    void handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
-    void handleRowsInserted(const QModelIndex &parent, int first, int last);
     void headerLinkActivated(QString);
     void partContextMenuRequested(const QPoint &point);
     void partLinkHovered(const QString &link, const QString &title, const QString &textContent);
@@ -100,6 +100,7 @@ private slots:
     void onWebViewLoadStarted();
     void onWebViewLoadFinished();
     void handleMessageModelError(const QString& error);
+    void handleMessageAvailable();
 signals:
     void messageChanged();
     void messageModelChanged(QAbstractItemModel *model);
@@ -128,6 +129,8 @@ private:
     Spinner *m_loadingSpinner;
     QSettings *m_settings;
     QSet<QWebView*> m_loadingItems;
+
+    QMutex m_sync;
 
     MessageView(const MessageView &); // don't implement
     MessageView &operator=(const MessageView &); // don't implement

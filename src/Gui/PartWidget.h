@@ -32,11 +32,26 @@ class QModelIndex;
 
 namespace Gui
 {
-
+class EnvelopeView;
 class PartWidgetFactory;
 
+class AbstractMultipartWidget: public AbstractPartWidget
+{
+public:
+    AbstractMultipartWidget(PartWidgetFactory *factory, const QModelIndex &partIndex,
+                               const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
+
+protected:
+    virtual void rebuildWidgets() = 0;
+    PartWidgetFactory *m_factory;
+    const QPersistentModelIndex m_partIndex;
+    const int m_recursionDepth;
+    const PartWidgetFactory::PartLoadingOptions m_loadingOptions;
+
+};
+
 /** @short Message quoting support for multipart/alternative MIME type */
-class MultipartAlternativeWidget: public QTabWidget, public AbstractPartWidget
+class MultipartAlternativeWidget: public QTabWidget, public AbstractMultipartWidget
 {
     Q_OBJECT
 public:
@@ -44,12 +59,17 @@ public:
                                const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
     virtual QString quoteMe() const;
     virtual void reloadContents();
+
+protected slots:
+    void handleRowsInserted(QModelIndex parent, int first, int last);
+
 protected:
+    virtual void rebuildWidgets();
     bool eventFilter(QObject *o, QEvent *e);
 };
 
 /** @short Message quoting support for multipart/signed MIME type */
-class MultipartSignedWidget: public QGroupBox, public AbstractPartWidget
+class MultipartSignedWidget: public QGroupBox, public AbstractMultipartWidget
 {
     Q_OBJECT
 public:
@@ -57,10 +77,16 @@ public:
                           const PartWidgetFactory::PartLoadingOptions loadingOptions);
     virtual QString quoteMe() const;
     virtual void reloadContents();
+
+protected slots:
+    void handleRowsInserted(QModelIndex parent, int first, int last);
+
+protected:
+    virtual void rebuildWidgets();
 };
 
 /** @short Message quoting support for generic multipart/ * */
-class GenericMultipartWidget: public QWidget, public AbstractPartWidget
+class GenericMultipartWidget: public QWidget, public AbstractMultipartWidget
 {
     Q_OBJECT
 public:
@@ -69,18 +95,15 @@ public:
     virtual QString quoteMe() const;
     virtual void reloadContents();
 
-public slots:
+protected slots:
     void handleRowsInserted(QModelIndex parent, int first, int last);
 
-private:
-    QModelIndex m_partIndex;
-    PartWidgetFactory *m_factory;
-    int m_recursionDepth;
-    const PartWidgetFactory::PartLoadingOptions m_loadingOptions;
+protected:
+    virtual void rebuildWidgets();
 };
 
 /** @short Message quoting support for generic multipart/ * */
-class Message822Widget: public QWidget, public AbstractPartWidget
+class Message822Widget: public QWidget, public AbstractMultipartWidget
 {
     Q_OBJECT
 public:
@@ -88,6 +111,15 @@ public:
                      const PartWidgetFactory::PartLoadingOptions loadingOptions);
     virtual QString quoteMe() const;
     virtual void reloadContents();
+
+protected slots:
+    void handleRowsInserted(QModelIndex parent, int first, int last);
+
+protected:
+    virtual void rebuildWidgets();
+
+private:
+    EnvelopeView* m_envelope;
 };
 
 

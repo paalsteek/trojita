@@ -39,9 +39,13 @@ class SMIMEHelper;
 }
 
 namespace Common {
+class MessagePartFactory;
 
-class MessagePart : public QObject {
+class MessagePart : public QObject
+{
     Q_OBJECT
+
+    friend class MessagePartFactory;
 
 public:
     MessagePart(MessagePart *parent, int row);
@@ -55,19 +59,28 @@ public:
     virtual QVariant data(int role) = 0;
 
     void replaceChild(int row, MessagePart* part);
+    bool childrenLoaded() { return m_children.size() == rowCount(); }
+
+protected slots:
+    void addChild(int row, int column, MessagePart* part);
 
 signals:
     void partChanged();
+    void needChild(int row, int column);
+    void aboutToBeInserted(int row, int count);
+    void endInsert();
 
 private:
     virtual MessagePart* newChild(int row) = 0;
 
     MessagePart *m_parent;
-    QHash<int, MessagePart*> children;
+    QHash<int, MessagePart*> m_children;
+    MessagePartFactory *m_factory;
     int m_row;
 };
 
-class ProxyMessagePart : public MessagePart {
+class ProxyMessagePart : public MessagePart
+{
     Q_OBJECT
 
 public:
@@ -87,7 +100,8 @@ private:
 };
 
 #ifdef TROJITA_HAVE_MIMETIC
-class LocalMessagePart : public MessagePart {
+class LocalMessagePart : public MessagePart
+{
 public:
     LocalMessagePart(MessagePart *parent, int row, mimetic::MimeEntity* pMe);
     ~LocalMessagePart();
@@ -120,7 +134,8 @@ protected:
     mimetic::MimeEntity *m_me;
 };
 
-class EncryptedMessagePart : public LocalMessagePart {
+class EncryptedMessagePart : public LocalMessagePart
+{
     Q_OBJECT
 
 public:
@@ -140,6 +155,12 @@ protected:
     MessagePart* m_raw;
 };
 #endif /* TROJITA_HAVE_MIMETIC */
+
+class SignedMessagePart : public ProxyMessagePart
+{
+    Q_OBJECT
+
+};
 
 class MessageModel: public QAbstractItemModel
 {
@@ -163,6 +184,8 @@ signals:
 private slots:
     void handlePartChanged();
     void handlePartDecrypted();
+    void handleAboutToBeInserted(int row, int count);
+    void handleEndInsert();
 
 protected:
     const QPersistentModelIndex m_message;
