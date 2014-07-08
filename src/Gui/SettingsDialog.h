@@ -250,6 +250,7 @@ public:
     virtual void save(QSettings &s);
     virtual QWidget *asWidget();
     virtual bool checkValidity() const;
+    virtual bool passwordFailures(QString &message) const;
 
 protected:
     virtual void resizeEvent(QResizeEvent *event);

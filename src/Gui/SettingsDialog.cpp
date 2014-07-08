@@ -770,6 +770,12 @@ bool CryptographyPage::checkValidity() const
     return true; //TODO: add some validity checks here
 }
 
+bool CryptographyPage::passwordFailures(QString &message) const
+{
+    Q_UNUSED(message);
+    return false;
+}
+
 void CryptographyPage::handleSelectDefaultKey()
 {
     SelectOpenPGPKey *select = new SelectOpenPGPKey(this);
