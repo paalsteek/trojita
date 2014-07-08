@@ -158,13 +158,13 @@ ComposeWidget::ComposeWidget(MainWindow *mainWindow, QSettings *settings, MSA::M
 
     m_signButton = new QToolButton(ui->buttonBox);
     m_signButton->setText(QLatin1String("Sign"));
-    m_signButton->setIcon(Gui::loadIcon("mail-sign"));
+    m_signButton->setIcon(Gui::loadIcon(QLatin1String("mail-sign")));
     m_signButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     m_signButton->setCheckable(true);
     m_signButton->setChecked(m_settings->value(Common::SettingsNames::composerSignDefault, false).toBool());
     m_encButton = new QToolButton(ui->buttonBox);
     m_encButton->setText(QLatin1String("Encrypt"));
-    m_encButton->setIcon(Gui::loadIcon("mail-encrypt"));
+    m_encButton->setIcon(Gui::loadIcon(QLatin1String("mail-encrypt")));
     m_encButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     m_encButton->setCheckable(true);
     m_encButton->setChecked(m_settings->value(Common::SettingsNames::composerEncryptDefault, false).toBool());

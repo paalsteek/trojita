@@ -676,7 +676,7 @@ bool MessageComposer::signRawMessage(QIODevice *target, QString *errorMessage, Q
     QCA::KeyStoreManager manager;
     QCA::KeyStoreManager::start();
     manager.waitForBusyFinished(); //TODO: synchronous wait?
-    QCA::KeyStore store("qca-gnupg", &manager);
+    QCA::KeyStore store(QLatin1String("qca-gnupg"), &manager);
     QCA::SecureMessageKey key;
 
     Q_FOREACH(QCA::KeyStoreEntry entry, store.entryList())
@@ -735,7 +735,7 @@ bool MessageComposer::encryptRawMessage(QIODevice *target, QString* errorMessage
     QCA::KeyStoreManager manager;
     QCA::KeyStoreManager::start();
     manager.waitForBusyFinished(); //TODO: synchronous wait?
-    QCA::KeyStore store("qca-gnupg", &manager);
+    QCA::KeyStore store(QLatin1String("qca-gnupg"), &manager);
 
     //QCA::SecureMessageKeyList keys;
     //Recipient, keyfound, key
@@ -752,7 +752,7 @@ bool MessageComposer::encryptRawMessage(QIODevice *target, QString* errorMessage
             {
                 int i = m_recipients.indexOf(recipient);
                 QCA::PGPKey pubKey = entry.pgpPublicKey();
-                if (pubKey.userIds().filter(recipient.second.asSMTPMailbox()).length() > 0) //TODO: QStringList::filter?
+                if (pubKey.userIds().filter(QLatin1String(recipient.second.asSMTPMailbox())).length() > 0) //TODO: QStringList::filter?
                 {
                     qDebug() << "Public key user IDs:" << pubKey.userIds();
                     QCA::SecureMessageKey key;

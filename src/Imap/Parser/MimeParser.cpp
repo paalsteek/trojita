@@ -23,11 +23,11 @@ void MimeParser::parseMessage(QByteArray message, Mailbox::TreeItemPart *parent)
 void MimeParser::storeInterestingFields(Mailbox::TreeItemPart *part, mimetic::Header *header)
 {
     mimetic::ContentType type = header->contentType();
-    QString charset = QString::fromStdString(type.param("charset"));
+    QByteArray charset = QByteArray(type.param("charset").c_str(), type.param("charset").length());
     if ( ! charset.isEmpty() )
         part->setCharset(charset);
 
-    QString protocol = QString::fromStdString(type.param("protocol"));
+    QByteArray protocol = QByteArray(type.param("protocol").c_str(), type.param("protocol").length());
     if ( ! protocol.isEmpty() )
         part->setProtocol(protocol);
 
@@ -43,7 +43,8 @@ Mailbox::TreeItem *MimeParser::createTreeItems(mimetic::MimeEntity *pMe, Mailbox
 {
     mimetic::Header &h = pMe->header();
     qDebug() << "new message part found:" << QString::fromStdString(h.contentType().str());
-    Mailbox::TreeItemPart *part = new Mailbox::TreeItemPart(parent, QString::fromStdString(h.contentType().type() + "/" + h.contentType().subtype()));
+    std::string mimeType = h.contentType().type() + "/" + h.contentType().subtype();
+    Mailbox::TreeItemPart *part = new Mailbox::TreeItemPart(parent, QByteArray(mimeType.c_str(), mimeType.length()));
     part->setFetchStatus(Mailbox::TreeItem::LOADING);
     storeInterestingFields(part, &h);
     if ( h.contentType().isMultipart() )

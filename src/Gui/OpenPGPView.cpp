@@ -157,7 +157,7 @@ QString OpenPGPView::quoteMe() const
         if (w)
             res += w->quoteMe();
     }
-    return res.join("\n");
+    return res.join(QLatin1Char('\n'));
 }
 
 void OpenPGPView::handleDataChangedForVerification(const QModelIndex &topLeft, const QModelIndex &bottomRight)
@@ -313,14 +313,14 @@ void OpenPGPView::slotDisplayVerificationResult()
     if (!m_msg->success() || !m_msg->verifySuccess())
     {
         lbl->setText(tr("Signature verification failed. %1").arg(strerror(m_msg->errorCode())));
-        pgpFrame->setStyleSheet("background-color: rgba(200, 0, 0, 50%);");
+        pgpFrame->setStyleSheet(QLatin1String("background-color: rgba(200, 0, 0, 50%);"));
         qDebug() << "failed: " << m_msg->diagnosticText();
     } else {
         QString signer;
         QCA::KeyStoreManager manager;
         QCA::KeyStoreManager::start();
         manager.waitForBusyFinished(); //TODO: synchronous wait?
-        QCA::KeyStore store("qca-gnupg", &manager);
+        QCA::KeyStore store(QLatin1String("qca-gnupg"), &manager);
         QCA::PGPKey key = m_msg->signer().key().pgpPublicKey();
         Q_FOREACH(QCA::KeyStoreEntry entry, store.entryList())
         {
@@ -334,7 +334,7 @@ void OpenPGPView::slotDisplayVerificationResult()
         }
         lbl->setText(tr("Signature with key \"%1\" (%2) successfully verified.").arg(signer, key.keyId()));
         lbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        pgpFrame->setStyleSheet("background-color: rgba(0, 150, 0, 50%);");
+        pgpFrame->setStyleSheet(QLatin1String("background-color: rgba(0, 150, 0, 50%);"));
         qDebug() << "success: " << m_msg->diagnosticText();
     }
     QVBoxLayout *l = new QVBoxLayout();

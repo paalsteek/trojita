@@ -33,7 +33,7 @@ KeyListModel::KeyListModel(QObject *parent) :
 {
     m_manager.start();
     m_manager.waitForBusyFinished(); //TODO: synchronous wait?
-    m_store = new QCA::KeyStore("qca-gnupg", &m_manager);
+    m_store = new QCA::KeyStore(QLatin1String("qca-gnupg"), &m_manager);
 
     //m_list = QtConcurrent::blockingMapped(m_store->entryList(), pgpPublicKey);
     Q_FOREACH(QCA::KeyStoreEntry e, m_store->entryList())
@@ -53,7 +53,7 @@ QVariant KeyListModel::data(const QModelIndex &index, int role) const
     switch(role)
     {
     case Qt::DisplayRole:
-        return QVariant(QString("%1 (%2)").arg(m_list[index.row()].primaryUserId(), m_list[index.row()].keyId()));
+        return QVariant(QString::fromUtf8("%1 (%2)").arg(m_list[index.row()].primaryUserId(), m_list[index.row()].keyId()));
     }
     return QVariant();
 }
