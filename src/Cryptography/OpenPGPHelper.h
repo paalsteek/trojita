@@ -25,8 +25,8 @@
 
 #include "Imap/Model/Model.h"
 
-namespace mimetic {
-class MimeEntity;
+namespace Common {
+class LocalMessagePart;
 }
 
 namespace QCA {
@@ -44,7 +44,7 @@ namespace Cryptography {
         void decrypt(const QModelIndex& parent);
 
     signals:
-        void dataDecrypted(mimetic::MimeEntity *pMe);
+        void dataDecrypted(Common::LocalMessagePart *part);
         void decryptionFailed(const QString& error);
 
     private slots:

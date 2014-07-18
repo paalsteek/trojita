@@ -25,48 +25,40 @@
 
 #include "MessagePartFactory.h"
 #include "ProxyModel.h"
+#include "Cryptography/OpenPGPHelper.h"
 #include "Imap/Model/ItemRoles.h"
 
 namespace Common {
 
-void MessagePartFactory::createPart(int row, int column)
+MessagePartFactory::MessagePartFactory() : m_pgpHelper(new Cryptography::OpenPGPHelper(this)) {}
+
+void MessagePartFactory::buildProxyTree(const QModelIndex& source, MessagePart* destination)
 {
-    MessagePart *part, *child;
-    part = qobject_cast<MessagePart*>(sender());
-    Q_ASSERT(part);
-#ifdef TROJITA_HAVE_MIMETIC
-    if (column != 0) {
-        EncryptedMessagePart* encPart = qobject_cast<EncryptedMessagePart*>(part);
-        Q_ASSERT(encPart);
-        emit newPart(row, column, encPart->rawPart());
-    }
-#endif /* TROJITA_HAVE_MIMETIC */
-    child = part->newChild(row);
+    if ( source.data(Imap::Mailbox::RolePartMimeType).toString().compare("multipart/encrypted") == 0 ) {
+        //TODO: populate raw data
 
-#ifdef TROJITA_HAVE_MIMETIC
-    if (child && child->data(Imap::Mailbox::RolePartMimeType).isValid()
-            && child->data(Imap::Mailbox::RolePartMimeType).toString().toLower() == QLatin1String("multipart/encrypted")) {
-        EncryptedMessagePart* encPart = new EncryptedMessagePart(part, row, child);
-        if (part) {
-            part->replaceChild(row, encPart);
-        }
-        child = encPart;
-        //connect(m_pgpHelper, SIGNAL(dataDecrypted(mimetic::MimeEntity*)), encPart, SLOT(handleDataDecrypted(mimetic::MimeEntity*)));
-        //connect(encPart, SIGNAL(partDecrypted()), this, SLOT(handlePartDecrypted()));
-        //m_pgpHelper->decrypt(index);
-        //return index;
-    }
-#endif /* TROJITA_HAVE_MIMETIC */
 
-    if (child) {
-        qDebug() << "Created" << child->data(Imap::Mailbox::RolePartPathToPart).toString() << "[" << child->data(Imap::Mailbox::RolePartMimeType).toString() << "]";
-        child->setObjectName("MessagePart" + child->data(Imap::Mailbox::RolePartPathToPart).toString());
-    } else {
-        qDebug() << "Factory found null";
+        // TODO: some placeholder?
         return;
     }
+    int i = 0;
+    QModelIndex child = source.child(i, 0);
+    while ( child.isValid() ) {
+        MessagePart* part = new ProxyMessagePart(destination, i, child);
+        destination->setChild(i, 0, part);
+        buildProxyTree(child, part);
+        child = source.child(++i, 0);
+    }
+}
 
-    emit newPart(row, column, child);
+void MessagePartFactory::buildSubtree(const QModelIndex &parent, MessageModel *model)
+{
+    MessagePart* child = new ProxyMessagePart(0, 0, parent);
+    buildProxyTree(parent, child);
+    QVector<MessagePart*> children;
+    children.append(child);
+
+    model->insertSubtree(QModelIndex(), 0, 0, children);
 }
 
 }

@@ -202,7 +202,6 @@ void MessageView::setMessage(const QModelIndex &index)
     }
     if (!messageModel) {
         messageModel = new Common::MessageModel(this, messageIndex);
-        connect(messageModel, SIGNAL(decryptionFailed(QString)), this, SLOT(handleMessageModelError(QString)));
         connect(messageModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleMessageAvailable()));
         emit messageModelChanged(messageModel);
     }

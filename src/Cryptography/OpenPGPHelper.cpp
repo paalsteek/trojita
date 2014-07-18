@@ -25,10 +25,11 @@
 #include <QDebug>
 
 #include "configure.cmake.h"
+#include "Common/ProxyModel.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 
-#ifdef TROJTIA_HAVE_MIMETIC
+#ifdef TROJITA_HAVE_MIMETIC
 #include <mimetic/mimetic.h>
 #endif /* TROJITA_HAVE_MIMETIC */
 
@@ -116,6 +117,24 @@ void OpenPGPHelper::handleDataChanged(const QModelIndex &topLeft, const QModelIn
 #endif /* TROJITA_HAVE_QCA */
 }
 
+Common::LocalMessagePart* MimeEntityToPart(const mimetic::MimeEntity& me)
+{
+    Common::LocalMessagePart *part = new Common::LocalMessagePart(nullptr, 0); //TODO: parent, row?
+    if (me.body().parts().size() > 0)
+    {
+        int i = 0;
+        Q_FOREACH(mimetic::MimeEntity* child, me.body().parts()) {
+            Common::LocalMessagePart *childPart = MimeEntityToPart(*child);
+            childPart->setParent(part);
+            childPart->setRow(i);
+            part->setChild(i++,0, childPart);
+        }
+    } else {
+        part->setData(QByteArray::fromRawData(me.body().data(), me.body().size()));
+    }
+    return part;
+}
+
 void OpenPGPHelper::decryptionFinished()
 {
 #ifdef TROJITA_HAVE_QCA
@@ -133,8 +152,9 @@ void OpenPGPHelper::decryptionFinished()
             message.append(msg->read());
         }
         qDebug() << message;
-        mimetic::MimeEntity *me = new mimetic::MimeEntity(message.begin(), message.end());
-        emit dataDecrypted(me);
+        mimetic::MimeEntity me(message.begin(), message.end());
+        Common::LocalMessagePart *part = MimeEntityToPart(me);
+        emit dataDecrypted(part);
     }
 #endif /* TROJITA_HAVE_QCA */
 }

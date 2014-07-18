@@ -25,7 +25,6 @@
 #include "LoadablePartWidget.h"
 #include "PartWidget.h"
 #include "SimplePartWidget.h"
-#include "Common/ProxyModel.h"
 #include "Common/SettingsNames.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"

@@ -27,19 +27,25 @@
 
 class QModelIndex;
 
+namespace Cryptography {
+class OpenPGPHelper;
+}
 namespace Common {
+class MessageModel;
 class MessagePart;
 
 class MessagePartFactory: public QObject {
     Q_OBJECT
 public:
-    MessagePartFactory() {}
+    MessagePartFactory();
+    void buildSubtree(const QModelIndex& parent, MessageModel* model);
 
 protected slots:
-    void createPart(int row, int column);
 
-signals:
-    void newPart(int row, int column, MessagePart* part);
+private:
+    void buildProxyTree(const QModelIndex& source, MessagePart* destination);
+
+    Cryptography::OpenPGPHelper *m_pgpHelper;
 };
 }
 #endif /* COMMON_MESSAGEPARTFACTORY_H */

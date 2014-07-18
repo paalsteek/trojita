@@ -45,85 +45,46 @@ QCA::Initializer init;
 //TODO: handling of special columns
 
 MessagePart::MessagePart(MessagePart *parent, int row)
-    : QObject()
-    , m_parent(parent)
-    , m_factory(new MessagePartFactory())
+    : m_parent(parent)
+    , m_children()
     , m_row(row)
 {
-    //TODO: singleton for messagepartfactory?
-    connect(this, SIGNAL(needChild(int,int)), m_factory, SLOT(createPart(int,int)), Qt::QueuedConnection);
-    connect(m_factory, SIGNAL(newPart(int,int,MessagePart*)), this, SLOT(addChild(int,int,MessagePart*)), Qt::QueuedConnection);
 }
 
 MessagePart::~MessagePart()
 {
 }
 
-MessagePart* MessagePart::child(int row)
+MessagePart* MessagePart::child(int row, int column) const
 {
-    if ( !m_children.contains(row) ) {
-        emit needChild(row, 0);
+    //TODO: handle column
+    if ( m_children.size() <= row ) {
         return nullptr;
     }
     return m_children[row];
 }
 
-void MessagePart::replaceChild(int row, MessagePart *part)
-{
-    Q_ASSERT(m_children.contains(row));
-
-    m_children.insert(row, part);
-}
-
-void MessagePart::addChild(int row, int column, MessagePart *part)
+void MessagePart::setChild(int row, int column, MessagePart *part)
 {
     Q_UNUSED(column);
-    if (m_children.contains(row))
-        return;
-    emit aboutToBeInserted(row, 1);
+    Q_ASSERT(m_children.size() >= row);
     m_children.insert(row, part);
-    emit endInsert();
+    part->setParent(this);
+    part->setRow(row);
 }
 
 ProxyMessagePart::ProxyMessagePart(MessagePart *parent, int row, const QModelIndex& sourceIndex)
     : MessagePart(parent, row)
     , m_sourceIndex(sourceIndex)
 {
-    connect(sourceIndex.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleSourceDataChanged(QModelIndex,QModelIndex)));
 }
 
 ProxyMessagePart::~ProxyMessagePart()
 {
 }
 
-MessagePart* ProxyMessagePart::newChild(int row)
-{
-    if (row >= rowCount())
-        return nullptr;
-
-    ProxyMessagePart* child = new ProxyMessagePart(this, row, m_sourceIndex.child(row, 0));
-    return child;
-}
-
-int ProxyMessagePart::rowCount() const
-{
-    return m_sourceIndex.model()->rowCount(m_sourceIndex);
-}
-
-void ProxyMessagePart::handleSourceDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
-{
-    Q_ASSERT(topLeft.parent() == bottomRight.parent());
-    if (topLeft.parent() == m_sourceIndex.parent()
-            && topLeft.row() <= m_sourceIndex.row()
-            && m_sourceIndex.row() <= bottomRight.row()) {
-        emit partChanged();
-    }
-}
-
-#ifdef TROJITA_HAVE_MIMETIC
-LocalMessagePart::LocalMessagePart(MessagePart *parent, int row, mimetic::MimeEntity *pMe)
+LocalMessagePart::LocalMessagePart(MessagePart *parent, int row)
     : MessagePart(parent, row)
-    , m_me(pMe)
 {
 }
 
@@ -131,213 +92,13 @@ LocalMessagePart::~LocalMessagePart()
 {
 }
 
-MessagePart* LocalMessagePart::newChild(int row)
-{
-    Q_ASSERT(m_me);
-    if (row >= rowCount())
-        return nullptr;
-
-    mimetic::MimeEntityList::iterator it = m_me->body().parts().begin();
-    for (int i = 0; i < row; i++) { it++; }
-    MessagePart* child = new LocalMessagePart(this, row, *it);
-    return child;
-}
-
-int LocalMessagePart::rowCount() const
-{
-    if (!m_me)
-        return 0;
-
-    return m_me->body().parts().size();
-}
-
-QString LocalMessagePart::mimetype() const
-{
-    Q_ASSERT(m_me);
-
-    QString type = QString(m_me->header().contentType().type().c_str());
-    QString subtype = QString(m_me->header().contentType().subtype().c_str());
-
-    return QString("%1/%2").arg(type, subtype);
-}
-
-QByteArray LocalMessagePart::data() const
-{
-    Q_ASSERT(m_me);
-
-    QByteArray rawData = QByteArray::fromRawData(m_me->body().data(), m_me->body().size());
-    if (!m_me->body().parts().empty()) {
-        std::stringstream ss;
-        for(mimetic::MimeEntityList::iterator it = m_me->body().parts().begin(), end = m_me->body().parts().end(); it != end; it++)
-        {
-            ss << **it;
-        }
-        rawData = QByteArray::fromRawData(ss.str().c_str(), ss.str().length());
-    }
-    QByteArray data;
-    Imap::decodeContentTransferEncoding(rawData, transferEncoding(), &data);
-    return data;
-}
-
-int LocalMessagePart::octets() const
-{
-    Q_ASSERT(m_me);
-
-    return m_me->size();
-}
-
-QString LocalMessagePart::charset() const
-{
-    Q_ASSERT(m_me);
-
-    return QString::fromStdString(m_me->header().contentType().param("charset"));
-}
-
-QString LocalMessagePart::protocol() const
-{
-    Q_ASSERT(m_me);
-
-    return QString(m_me->header().contentType().param("protocol").c_str());
-}
-
-QString LocalMessagePart::filename() const
-{
-    Q_ASSERT(m_me);
-
-    QString filename = QString(m_me->header().contentDisposition().param("filename").c_str());
-    if (filename.isEmpty()) {
-        std::string rawstr = m_me->header().contentDisposition().param("filename*");
-        QByteArray raw = QByteArray::fromRawData(rawstr.c_str(), rawstr.length());
-
-        filename = Imap::decodeRFC2231String(raw);
-    }
-    if (filename.isEmpty())
-        filename = QString(m_me->header().contentType().param("name").c_str());
-    return filename;
-}
-
-QString LocalMessagePart::format() const
-{
-    Q_ASSERT(m_me);
-
-    return QString::fromStdString(m_me->header().contentType().param("format"));
-}
-
-QString LocalMessagePart::delsp() const
-{
-    Q_ASSERT(m_me);
-
-    return QString::fromStdString(m_me->header().contentType().param("delsp"));
-}
-
-QByteArray LocalMessagePart::transferEncoding() const
-{
-    Q_ASSERT(m_me);
-
-    std::string rawEncoding = m_me->header().contentTransferEncoding().str();
-    return QByteArray::fromRawData(rawEncoding.c_str(), rawEncoding.size());
-}
-
-QByteArray LocalMessagePart::bodyDisposition() const
-{
-    Q_ASSERT(m_me);
-
-    std::string rawBodyDisposition = m_me->header().contentDisposition().type();
-    return QByteArray::fromRawData(rawBodyDisposition.c_str(), rawBodyDisposition.size());
-}
-
-QByteArray LocalMessagePart::bodyFldId() const
-{
-    Q_ASSERT(m_me);
-
-    std::string rawBodyFldId = m_me->header().contentId().str();
-    return QByteArray::fromRawData(rawBodyFldId.c_str(), rawBodyFldId.size());
-}
-
-QByteArray LocalMessagePart::relatedMainCid() const
-{
-    Q_ASSERT(m_me);
-
-    std::string rawMainCid = m_me->header().contentType().param("start");
-    return QByteArray::fromRawData(rawMainCid.c_str(), rawMainCid.size());
-}
-
-QString LocalMessagePart::partId() const {
-    if (isTopLevelMultipart())
-        return QString();
-
-    QString id = QString::number(row() + 1);
-    if (parent() && !parent()->data(Imap::Mailbox::RolePartId).toString().isEmpty())
-        id = parent()->data(Imap::Mailbox::RolePartId).toString() + QChar('.') + id;
-
-    return id;
-}
-
-QString LocalMessagePart::pathToPart() const {
-    // This item is not directly fetcheable, so it does *not* make sense to ask for it.
-    // We cannot really assert at this point, though, because this function is published via the MVC interface.
-    //return QLatin1String("application-bug-dont-fetch-this");
-    // TODO: do we need some way to prevent fetching of local parts?
-    QString parentPath = QLatin1String("");
-    if (parent()) {
-        parentPath = parent()->data(Imap::Mailbox::RolePartPathToPart).toString();
-    }
-    return parentPath + QChar('/') + QString::number(row());
-}
-
-bool LocalMessagePart::isTopLevelMultipart() const {
-    return mimetype().startsWith("multipart/") && (!parent()->parent() || parent()->data(Imap::Mailbox::RolePartMimeType).toString().startsWith("message/"));
-}
-
-QList<Imap::Message::MailAddress> mailboxListToQList(const mimetic::MailboxList& list) {
-    QList<Imap::Message::MailAddress> result;
-    Q_FOREACH(mimetic::Mailbox addr, list)
-    {
-        result.append(Imap::Message::MailAddress(
-                        QString::fromStdString(addr.label()),
-                        QString::fromStdString(addr.sourceroute()),
-                        QString::fromStdString(addr.mailbox()),
-                        QString::fromStdString(addr.domain())));
-    }
-    return result;
-}
-
-QList<Imap::Message::MailAddress> addressListToQList(const mimetic::AddressList& list) {
-    QList<Imap::Message::MailAddress> result;
-    Q_FOREACH(mimetic::Address addr, list)
-    {
-        if (addr.isGroup()) {
-            mimetic::Group group = addr.group();
-            for (mimetic::Group::iterator it = group.begin(), end = group.end(); it != end; it++) {
-                mimetic::Mailbox mb = *it;
-                result.append(Imap::Message::MailAddress(
-                                  QString::fromStdString(mb.label()),
-                                  QString::fromStdString(mb.sourceroute()),
-                                  QString::fromStdString(mb.mailbox()),
-                                  QString::fromStdString(mb.domain())));
-            }
-        } else {
-            mimetic::Mailbox mb = addr.mailbox();
-            result.append(Imap::Message::MailAddress(
-                              QString::fromStdString(mb.label()),
-                              QString::fromStdString(mb.sourceroute()),
-                              QString::fromStdString(mb.mailbox()),
-                              QString::fromStdString(mb.domain())));
-        }
-    }
-    return result;
-}
-
-QVariant LocalMessagePart::data(int role)
+QVariant LocalMessagePart::data(int role) const
 {
     if (role == Imap::Mailbox::RoleIsFetched) {
-        return !!m_me;
+        return true;
     }
 
-    if (!m_me)
-        return QVariant();
-
-    switch (role) {
+    /*switch (role) {
     case Qt::DisplayRole:
         if (isTopLevelMultipart())
             return QString("%1").arg(mimetype());
@@ -346,11 +107,11 @@ QVariant LocalMessagePart::data(int role)
     case Qt::ToolTipRole:
     {
         mimetic::Body b = m_me->body();
-        return b.size() > 10000 ? tr("%1 bytes of data").arg(b.size()) : b.data();
+        return b.size() > 10000 ? QString("%1 bytes of data").arg(b.size()) : b.data();
     }
-    }
+    }*/
 
-    if (mimetype().toLower() == QLatin1String("message/rfc822")) {
+    /*if (mimetype().toLower() == QLatin1String("message/rfc822")) {
         switch (role) {
         case Imap::Mailbox::RoleMessageEnvelope:
             mimetic::Header h = (*(m_me->body().parts().begin()))->header();
@@ -376,14 +137,14 @@ QVariant LocalMessagePart::data(int role)
             QByteArray messageId = QByteArray::fromRawData(h.messageid().str().c_str(), h.messageid().str().length());
             return QVariant::fromValue<Imap::Message::Envelope>(Imap::Message::Envelope(date, subject, from, sender, replyTo, to, cc, bcc, inReplyTo, messageId));
         }
-    }
+    }*/
 
     switch (role) {
     case Imap::Mailbox::RoleIsUnavailable:
         return false;
     case Imap::Mailbox::RolePartData:
-        return data();
-    case Imap::Mailbox::RolePartMimeType:
+        return m_data;
+    /*case Imap::Mailbox::RolePartMimeType:
         return mimetype();
     case Imap::Mailbox::RolePartCharset:
         return charset();
@@ -412,7 +173,7 @@ QVariant LocalMessagePart::data(int role)
             return QVariant();
         }
     case Imap::Mailbox::RolePartIsTopLevelMultipart:
-        return isTopLevelMultipart();
+        return isTopLevelMultipart();*/
     case Imap::Mailbox::RolePartForceFetchFromCache:
         return QVariant(); // Nothing to do here
     default:
@@ -424,29 +185,14 @@ QVariant LocalMessagePart::data(int role)
     return QVariant();
 }
 
-EncryptedMessagePart::EncryptedMessagePart(MessagePart *parent, int row, MessagePart *raw)
-    : LocalMessagePart(parent, row, nullptr)
-    , m_raw(raw)
-{
-}
-
-void EncryptedMessagePart::handleDataDecrypted(mimetic::MimeEntity *pMe)
-{
-    disconnect(sender(), SIGNAL(dataDecrypted(mimetic::MimeEntity*)), this, SLOT(handleDataDecrypted(mimetic::MimeEntity*)));
-    m_me = pMe;
-    emit partDecrypted();
-    emit partChanged();
-}
-#endif /* TROJITA_HAVE_MIMETIC */
-
 MessageModel::MessageModel(QObject *parent, const QModelIndex &message)
     : QAbstractItemModel(parent)
     , m_message(message)
-    , m_rootPart(nullptr)
-    , m_pgpHelper(new Cryptography::OpenPGPHelper(this))
-    , m_smimeHelper(new Cryptography::SMIMEHelper(this))
+    , m_rootPart(0)
+    , m_factory(new MessagePartFactory())
 {
-    connect(m_pgpHelper, SIGNAL(decryptionFailed(QString)), this, SIGNAL(decryptionFailed(QString)));
+    connect(message.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SIGNAL(dataChanged(QModelIndex,QModelIndex)));
+    m_factory->buildSubtree(message, this);
 }
 
 MessageModel::~MessageModel()
@@ -458,7 +204,7 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
     MessagePart* child;
     if (!parent.isValid()) {
         if (!m_rootPart) {
-            m_rootPart = new ProxyMessagePart(nullptr, 0, m_message);
+            return QModelIndex();
         }
         child = m_rootPart;
     } else {
@@ -469,10 +215,6 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
 
     if (!child)
         return QModelIndex();
-
-    connect(child, SIGNAL(partChanged()), this, SLOT(handlePartChanged()), Qt::UniqueConnection);
-    connect(child, SIGNAL(aboutToBeInserted(int,int)), this, SLOT(handleAboutToBeInserted(int,int)), Qt::UniqueConnection);
-    connect(child, SIGNAL(endInsert()), this, SLOT(handleEndInsert()), Qt::UniqueConnection);
 
     return createIndex(row, column, child);
 }
@@ -512,31 +254,18 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     return part->data(role);
 }
 
-void MessageModel::handlePartChanged()
+void MessageModel::insertSubtree(const QModelIndex& parent, int row, int column, const QVector<MessagePart *> &children)
 {
-    MessagePart* part = qobject_cast<MessagePart*>(sender());
-    QModelIndex index = createIndex(part->row(), 0, part);
-    emit dataChanged(index, index);
-}
-
-void MessageModel::handleAboutToBeInserted(int row, int count)
-{
-    MessagePart* part = qobject_cast<MessagePart*>(sender());
-    QModelIndex index = createIndex(part->row(), 0, part);
-    beginInsertRows(index, row, count);
-}
-
-void MessageModel::handleEndInsert()
-{
-    qDebug() << "MessageModel::handleEndInsert()";
-    endInsertRows();
-}
-
-void MessageModel::handlePartDecrypted()
-{
-    MessagePart* part = qobject_cast<MessagePart*>(sender());
-    QModelIndex index = createIndex(part->row(), 0, part);
-    beginInsertRows(index, 0, 1); // have to call this after the modification as otherwise rowCount is called before we updated m_parts
+    beginInsertRows(parent, row, row + children.size());
+    if (parent.isValid()) {
+        MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
+        Q_ASSERT(part);
+        for (int i = 0; i < children.size(); ++i) {
+            part->setChild(row + i, column, children[i]);
+        }
+    } else {
+        m_rootPart = children.first();
+    }
     endInsertRows();
 }
 }

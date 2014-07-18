@@ -632,6 +632,7 @@ add_dependencies(Common version)
 target_link_libraries(Common ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
 
 add_library(Crypto STATIC ${libCrypto_SOURCES})
+target_link_libraries(Crypto Common)
 if(WITH_QCA)
     target_link_libraries(Crypto ${QCA2_LIBRARIES})
 endif()
