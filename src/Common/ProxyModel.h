@@ -44,7 +44,7 @@ class MessagePartFactory;
 class MessagePart
 {
 public:
-    MessagePart(MessagePart *parent, int row);
+    MessagePart(MessagePart *parent);
     virtual ~MessagePart();
 
     MessagePart* parent() const { return m_parent; }
@@ -58,16 +58,19 @@ public:
     void setRow(int row) { m_row = row; }
     void setParent(MessagePart *parent) { m_parent = parent; }
 
+    void setRawPart(MessagePart *rawPart);
+
 private:
     MessagePart *m_parent;
     QVector<MessagePart*> m_children;
+    MessagePart *m_rawPart;
     int m_row;
 };
 
 class ProxyMessagePart : public MessagePart
 {
 public:
-    ProxyMessagePart(MessagePart *parent, int row, const QModelIndex &sourceIndex);
+    ProxyMessagePart(MessagePart *parent, const QModelIndex &sourceIndex);
     ~ProxyMessagePart();
 
     QVariant data(int role) const { return m_sourceIndex.data(role); }
@@ -79,17 +82,35 @@ private:
 class LocalMessagePart : public MessagePart
 {
 public:
-    LocalMessagePart(MessagePart *parent, int row);
+    /** @short Availability of an item */
+    enum FetchingState {
+        NONE, /**< @short No attempt to decrypt/load an item has been made yet */
+        UNAVAILABLE, /**< @short Item could not be decrypted/loaded */
+        LOADING, /**< @short Decryption/Loading of an item is already scheduled */
+        DONE /**< @short Item is available right now */
+    };
+    LocalMessagePart(MessagePart *parent, const QByteArray &mimetype);
     ~LocalMessagePart();
 
     QVariant data(int role) const;
 
-    void setData(const QByteArray& data) { m_data = data; }
-    void setRawChild(MessagePart *rawChild);
+    void setData(const QByteArray& data) { m_data = data; m_state = DONE; }
+    void setFetchingState(FetchingState state) { m_state = state; }
+    FetchingState getFetchingState() const { return m_state; }
+
+    void setOctets(int octets) { m_octets = octets; }
+    int octets() const { return m_octets; }
+
+private:
+    bool isTopLevelMultipart() const;
+    QString partId() const;
+    QString pathToPart() const;
 
 protected:
+    FetchingState m_state;
     QByteArray m_data;
-    MessagePart* m_rawChild;
+    QByteArray m_mimetype;
+    int m_octets;
 };
 
 class MessageModel: public QAbstractItemModel
@@ -105,9 +126,11 @@ public:
     int rowCount(const QModelIndex &parent) const;
     int columnCount(const QModelIndex &parent) const { return !m_rootPart ? 0 : 1; }
     QVariant data(const QModelIndex &index, int role) const;
-    void insertSubtree(const QModelIndex& parent, int row, int column, const QVector<MessagePart*>& children);
 
     QModelIndex message() { return m_message; }
+
+public slots:
+    void insertSubtree(const QModelIndex& parent, const QVector<Common::MessagePart*>& children);
 
 protected:
     const QPersistentModelIndex m_message;

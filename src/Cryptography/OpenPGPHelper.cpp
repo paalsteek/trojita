@@ -78,6 +78,7 @@ void OpenPGPHelper::decrypt(const QModelIndex &parent)
     if (QCA::isSupported("openpgp")) {
         m_partIndex = parent;
         QModelIndex sourceIndex = m_partIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
+        Q_ASSERT(sourceIndex.isValid());
         Q_ASSERT(sourceIndex.model()->rowCount(sourceIndex) == 2);
         connect(sourceIndex.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
         //Trigger lazy loading of the required message parts
@@ -119,19 +120,22 @@ void OpenPGPHelper::handleDataChanged(const QModelIndex &topLeft, const QModelIn
 
 Common::LocalMessagePart* MimeEntityToPart(const mimetic::MimeEntity& me)
 {
-    Common::LocalMessagePart *part = new Common::LocalMessagePart(nullptr, 0); //TODO: parent, row?
+    QString type = QString(me.header().contentType().type().c_str());
+    QString subtype = QString(me.header().contentType().subtype().c_str());
+    Common::LocalMessagePart *part = new Common::LocalMessagePart(nullptr, QString("%1/%2").arg(type, subtype).toUtf8());
     if (me.body().parts().size() > 0)
     {
         int i = 0;
         Q_FOREACH(mimetic::MimeEntity* child, me.body().parts()) {
             Common::LocalMessagePart *childPart = MimeEntityToPart(*child);
-            childPart->setParent(part);
-            childPart->setRow(i);
             part->setChild(i++,0, childPart);
         }
     } else {
-        part->setData(QByteArray::fromRawData(me.body().data(), me.body().size()));
+        QByteArray data(me.body().data(), me.body().size());
+        part->setData(data);
     }
+    part->setOctets(me.size());
+    part->setFetchingState(Common::LocalMessagePart::DONE);
     return part;
 }
 
@@ -154,7 +158,11 @@ void OpenPGPHelper::decryptionFinished()
         qDebug() << message;
         mimetic::MimeEntity me(message.begin(), message.end());
         Common::LocalMessagePart *part = MimeEntityToPart(me);
-        emit dataDecrypted(part);
+        QVector<Common::MessagePart*> children;
+        for ( int i = 0; i < part->rowCount(); ++i ) {
+            children.append(part->child(i, 0));
+        }
+        emit dataDecrypted(m_partIndex, children);
     }
 #endif /* TROJITA_HAVE_QCA */
 }

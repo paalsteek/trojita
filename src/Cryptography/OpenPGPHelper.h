@@ -26,6 +26,7 @@
 #include "Imap/Model/Model.h"
 
 namespace Common {
+class MessagePart;
 class LocalMessagePart;
 }
 
@@ -44,7 +45,7 @@ namespace Cryptography {
         void decrypt(const QModelIndex& parent);
 
     signals:
-        void dataDecrypted(Common::LocalMessagePart *part);
+        void dataDecrypted(const QModelIndex& parent, const QVector<Common::MessagePart*>& part);
         void decryptionFailed(const QString& error);
 
     private slots:

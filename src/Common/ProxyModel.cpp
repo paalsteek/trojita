@@ -25,6 +25,7 @@
 #include "Imap/Encoders.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/Model.h"
+#include "Imap/Model/MailboxTree.h"
 #include "Imap/Parser/Message.h"
 #include <QDebug>
 #include <QDateTime>
@@ -44,20 +45,27 @@ QCA::Initializer init;
 
 //TODO: handling of special columns
 
-MessagePart::MessagePart(MessagePart *parent, int row)
+MessagePart::MessagePart(MessagePart *parent)
     : m_parent(parent)
     , m_children()
-    , m_row(row)
+    , m_rawPart(nullptr)
+    , m_row(0)
 {
 }
 
 MessagePart::~MessagePart()
 {
+    // TODO: cleanup children/rawPart
 }
 
 MessagePart* MessagePart::child(int row, int column) const
 {
-    //TODO: handle column
+    if ( column == Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS ) {
+        Q_ASSERT(row == 0);
+        return m_rawPart;
+    }
+
+    Q_ASSERT(column == 0);
     if ( m_children.size() <= row ) {
         return nullptr;
     }
@@ -73,8 +81,14 @@ void MessagePart::setChild(int row, int column, MessagePart *part)
     part->setRow(row);
 }
 
-ProxyMessagePart::ProxyMessagePart(MessagePart *parent, int row, const QModelIndex& sourceIndex)
-    : MessagePart(parent, row)
+void MessagePart::setRawPart(MessagePart *rawPart)
+{
+    Q_ASSERT(!m_rawPart);
+    m_rawPart = rawPart;
+}
+
+ProxyMessagePart::ProxyMessagePart(MessagePart *parent, const QModelIndex& sourceIndex)
+    : MessagePart(parent)
     , m_sourceIndex(sourceIndex)
 {
 }
@@ -83,8 +97,10 @@ ProxyMessagePart::~ProxyMessagePart()
 {
 }
 
-LocalMessagePart::LocalMessagePart(MessagePart *parent, int row)
-    : MessagePart(parent, row)
+LocalMessagePart::LocalMessagePart(MessagePart *parent, const QByteArray& mimetype)
+    : MessagePart(parent)
+    , m_state(NONE)
+    , m_mimetype(mimetype)
 {
 }
 
@@ -92,24 +108,52 @@ LocalMessagePart::~LocalMessagePart()
 {
 }
 
+bool LocalMessagePart::isTopLevelMultipart() const
+{
+    return m_mimetype.startsWith("multipart/") && (!parent()->parent() || parent()->data(Imap::Mailbox::RolePartMimeType).toString().startsWith("message/"));
+}
+
+QString LocalMessagePart::partId() const
+{
+    if (isTopLevelMultipart())
+        return QString();
+
+    QString id = QString::number(row() + 1);
+    if (parent() && !parent()->data(Imap::Mailbox::RolePartId).toString().isEmpty())
+        id = parent()->data(Imap::Mailbox::RolePartId).toString() + QChar('.') + id;
+
+    return id;
+}
+
+QString LocalMessagePart::pathToPart() const {
+    // This item is not directly fetcheable, so it does *not* make sense to ask for it.
+    // We cannot really assert at this point, though, because this function is published via the MVC interface.
+    //return QLatin1String("application-bug-dont-fetch-this");
+    // TODO: do we need some way to prevent fetching of local parts?
+    QString parentPath = QLatin1String("");
+    if (parent()) {
+        parentPath = parent()->data(Imap::Mailbox::RolePartPathToPart).toString();
+    }
+    return parentPath + QLatin1Char('/') + QString::number(row());
+}
+
 QVariant LocalMessagePart::data(int role) const
 {
     if (role == Imap::Mailbox::RoleIsFetched) {
-        return true;
+        return m_state == DONE;
     }
 
-    /*switch (role) {
+    switch (role) {
     case Qt::DisplayRole:
         if (isTopLevelMultipart())
-            return QString("%1").arg(mimetype());
+            return QString("%1").arg(QString::fromLocal8Bit(m_mimetype));
         else
-            return QString("%1: %2").arg(partId(), mimetype());
+            return QString("%1: %2").arg(partId(), QString::fromLocal8Bit(m_mimetype));
     case Qt::ToolTipRole:
     {
-        mimetic::Body b = m_me->body();
-        return b.size() > 10000 ? QString("%1 bytes of data").arg(b.size()) : b.data();
+        return octets() > 10000 ? QString("%1 bytes of data").arg(octets()) : m_data;
     }
-    }*/
+    }
 
     /*if (mimetype().toLower() == QLatin1String("message/rfc822")) {
         switch (role) {
@@ -141,12 +185,12 @@ QVariant LocalMessagePart::data(int role) const
 
     switch (role) {
     case Imap::Mailbox::RoleIsUnavailable:
-        return false;
+        return m_state == UNAVAILABLE;
     case Imap::Mailbox::RolePartData:
         return m_data;
-    /*case Imap::Mailbox::RolePartMimeType:
-        return mimetype();
-    case Imap::Mailbox::RolePartCharset:
+    case Imap::Mailbox::RolePartMimeType:
+        return m_mimetype;
+    /*case Imap::Mailbox::RolePartCharset:
         return charset();
     case Imap::Mailbox::RolePartContentFormat:
         return format();
@@ -159,21 +203,21 @@ QVariant LocalMessagePart::data(int role) const
     case Imap::Mailbox::RolePartBodyDisposition:
         return bodyDisposition();
     case Imap::Mailbox::RolePartFileName:
-        return filename();
+        return filename();*/
     case Imap::Mailbox::RolePartOctets:
         return octets();
     case Imap::Mailbox::RolePartId:
         return partId();
     case Imap::Mailbox::RolePartPathToPart:
         return pathToPart();
-    case Imap::Mailbox::RolePartMultipartRelatedMainCid:
+    /*case Imap::Mailbox::RolePartMultipartRelatedMainCid:
         if (relatedMainCid().isEmpty()) {
             return relatedMainCid();
         } else {
             return QVariant();
-        }
+        }*/
     case Imap::Mailbox::RolePartIsTopLevelMultipart:
-        return isTopLevelMultipart();*/
+        return isTopLevelMultipart();
     case Imap::Mailbox::RolePartForceFetchFromCache:
         return QVariant(); // Nothing to do here
     default:
@@ -189,10 +233,10 @@ MessageModel::MessageModel(QObject *parent, const QModelIndex &message)
     : QAbstractItemModel(parent)
     , m_message(message)
     , m_rootPart(0)
-    , m_factory(new MessagePartFactory())
+    , m_factory(new MessagePartFactory(this))
 {
     connect(message.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SIGNAL(dataChanged(QModelIndex,QModelIndex)));
-    m_factory->buildSubtree(message, this);
+    m_factory->buildSubtree(message);
 }
 
 MessageModel::~MessageModel()
@@ -210,11 +254,12 @@ QModelIndex MessageModel::index(int row, int column, const QModelIndex &parent) 
     } else {
         MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
         Q_ASSERT(part);
-        child = part->child(row);
+        child = part->child(row, column);
     }
 
-    if (!child)
+    if (!child) {
         return QModelIndex();
+    }
 
     return createIndex(row, column, child);
 }
@@ -241,7 +286,14 @@ int MessageModel::rowCount(const QModelIndex &parent) const
 
     MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
     Q_ASSERT(part);
-    return part->rowCount();
+    int count = part->rowCount();
+    LocalMessagePart *localPart = dynamic_cast<LocalMessagePart*>(part);
+    if (localPart && localPart->getFetchingState() == LocalMessagePart::NONE) {
+        localPart->setFetchingState(LocalMessagePart::LOADING);
+        m_factory->buildSubtree(parent);
+    }
+
+    return count;
 }
 
 QVariant MessageModel::data(const QModelIndex &index, int role) const
@@ -254,15 +306,19 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     return part->data(role);
 }
 
-void MessageModel::insertSubtree(const QModelIndex& parent, int row, int column, const QVector<MessagePart *> &children)
+void MessageModel::insertSubtree(const QModelIndex& parent, const QVector<Common::MessagePart *> &children)
 {
-    beginInsertRows(parent, row, row + children.size());
+    //Q_ASSERT(rowCount(parent) == 0);
+    beginInsertRows(parent, 0, children.size());
     if (parent.isValid()) {
         MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
         Q_ASSERT(part);
         for (int i = 0; i < children.size(); ++i) {
-            part->setChild(row + i, column, children[i]);
+            part->setChild(i, 0, children[i]);
         }
+        LocalMessagePart *localPart = dynamic_cast<LocalMessagePart*>(part);
+        if (localPart)
+            localPart->setFetchingState(LocalMessagePart::DONE);
     } else {
         m_rootPart = children.first();
     }

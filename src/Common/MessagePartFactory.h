@@ -37,14 +37,15 @@ class MessagePart;
 class MessagePartFactory: public QObject {
     Q_OBJECT
 public:
-    MessagePartFactory();
-    void buildSubtree(const QModelIndex& parent, MessageModel* model);
+    MessagePartFactory(MessageModel* model);
 
-protected slots:
+public slots:
+    void buildSubtree(const QModelIndex& parent);
 
 private:
     void buildProxyTree(const QModelIndex& source, MessagePart* destination);
 
+    MessageModel *m_model;
     Cryptography::OpenPGPHelper *m_pgpHelper;
 };
 }

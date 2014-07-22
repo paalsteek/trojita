@@ -30,35 +30,42 @@
 
 namespace Common {
 
-MessagePartFactory::MessagePartFactory() : m_pgpHelper(new Cryptography::OpenPGPHelper(this)) {}
-
-void MessagePartFactory::buildProxyTree(const QModelIndex& source, MessagePart* destination)
+MessagePartFactory::MessagePartFactory(MessageModel *model)
+    : m_model(model)
+    , m_pgpHelper(new Cryptography::OpenPGPHelper(this))
 {
-    if ( source.data(Imap::Mailbox::RolePartMimeType).toString().compare("multipart/encrypted") == 0 ) {
-        //TODO: populate raw data
+    connect(m_pgpHelper, SIGNAL(dataDecrypted(QModelIndex,QVector<Common::MessagePart*>)), m_model, SLOT(insertSubtree(QModelIndex,QVector<Common::MessagePart*>)));
+}
 
-
-        // TODO: some placeholder?
-        return;
-    }
+void MessagePartFactory::buildProxyTree(const QModelIndex& source, MessagePart *destination)
+{
     int i = 0;
     QModelIndex child = source.child(i, 0);
     while ( child.isValid() ) {
-        MessagePart* part = new ProxyMessagePart(destination, i, child);
-        destination->setChild(i, 0, part);
+        MessagePart* part = new ProxyMessagePart(destination, child);
         buildProxyTree(child, part);
+        if ( child.data(Imap::Mailbox::RolePartMimeType).toString().compare("multipart/encrypted") ) {
+            destination->setChild(i, 0, part);
+        } else {
+            MessagePart* dummy = new LocalMessagePart(destination, child.data(Imap::Mailbox::RolePartMimeType).toByteArray());
+            dummy->setRawPart(part);
+            destination->setChild(i, 0, dummy);
+        }
         child = source.child(++i, 0);
     }
 }
 
-void MessagePartFactory::buildSubtree(const QModelIndex &parent, MessageModel *model)
+void MessagePartFactory::buildSubtree(const QModelIndex &parent)
 {
-    MessagePart* child = new ProxyMessagePart(0, 0, parent);
-    buildProxyTree(parent, child);
-    QVector<MessagePart*> children;
-    children.append(child);
-
-    model->insertSubtree(QModelIndex(), 0, 0, children);
+    if (parent.data(Imap::Mailbox::RolePartMimeType).toString().compare("multipart/encrypted") ) {
+        MessagePart* child = new ProxyMessagePart(0, parent);
+        buildProxyTree(parent, child);
+        QVector<MessagePart*> children;
+        children.append(child);
+        m_model->insertSubtree(QModelIndex(), children);
+    } else {
+        m_pgpHelper->decrypt(parent);
+    }
 }
 
 }
