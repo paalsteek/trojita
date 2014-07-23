@@ -26,6 +26,7 @@
 
 #include "configure.cmake.h"
 #include "Common/ProxyModel.h"
+#include "Imap/Encoders.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 
@@ -118,7 +119,46 @@ void OpenPGPHelper::handleDataChanged(const QModelIndex &topLeft, const QModelIn
 #endif /* TROJITA_HAVE_QCA */
 }
 
-Common::LocalMessagePart* MimeEntityToPart(const mimetic::MimeEntity& me)
+void OpenPGPHelper::storeInterestingFields(const mimetic::MimeEntity& me, Common::LocalMessagePart* part)
+{
+    part->setCharset(QString::fromStdString(me.header().contentType().param("charset")));
+    QString format = QString::fromStdString(me.header().contentType().param("format"));
+    if (!format.isEmpty()) {
+        part->setContentFormat(format);
+        part->setDelSp(QString::fromStdString(me.header().contentType().param("delsp")));
+    }
+    const mimetic::ContentDisposition& cd = me.header().contentDisposition();
+    QByteArray bodyDisposition(cd.type().c_str(), cd.type().size());
+    QString filename;
+    if (!bodyDisposition.isEmpty()) {
+        part->setBodyDisposition(bodyDisposition);
+        std::list<mimetic::ContentDisposition::Param> l = cd.paramList();
+        QMap<QByteArray, QByteArray> paramMap;
+        for (auto it = l.begin(); it != l.end(); ++it) {
+            const mimetic::ContentDisposition::Param& p = *it;
+            paramMap.insert(QByteArray(p.name().c_str(), p.name().size()), QByteArray(p.value().c_str(), p.value().size()));
+        }
+        filename = Imap::extractRfc2231Param(paramMap, "filename");
+    }
+    if (filename.isEmpty()) {
+        std::list<mimetic::ContentType::Param> l = me.header().contentType().paramList();
+        QMap<QByteArray, QByteArray> paramMap;
+        for (auto it = l.begin(); it != l.end(); ++it) {
+            const mimetic::ContentType::Param& p = *it;
+            paramMap.insert(QByteArray(p.name().c_str(), p.name().size()), QByteArray(p.value().c_str(), p.value().size()));
+        }
+        filename = Imap::extractRfc2231Param(paramMap, "name");
+    }
+
+    if (!filename.isEmpty()) {
+        part->setFilename(filename);
+    }
+
+    part->setEncoding(QByteArray(me.header().contentTransferEncoding().str().c_str(), me.header().contentTransferEncoding().str().size()));
+    part->setBodyFldId(QByteArray(me.header().contentId().str().c_str(), me.header().contentId().str().size()));
+}
+
+Common::LocalMessagePart* OpenPGPHelper::mimeEntityToPart(const mimetic::MimeEntity& me)
 {
     QString type = QString(me.header().contentType().type().c_str());
     QString subtype = QString(me.header().contentType().subtype().c_str());
@@ -127,11 +167,13 @@ Common::LocalMessagePart* MimeEntityToPart(const mimetic::MimeEntity& me)
     {
         int i = 0;
         Q_FOREACH(mimetic::MimeEntity* child, me.body().parts()) {
-            Common::LocalMessagePart *childPart = MimeEntityToPart(*child);
+            Common::LocalMessagePart *childPart = mimeEntityToPart(*child);
             part->setChild(i++,0, childPart);
         }
     } else {
-        QByteArray data(me.body().data(), me.body().size());
+        storeInterestingFields(me, part);
+        QByteArray data;
+        Imap::decodeContentTransferEncoding(QByteArray(me.body().data(), me.body().size()), part->data(Imap::Mailbox::RolePartEncoding).toByteArray(), &data);
         part->setData(data);
     }
     part->setOctets(me.size());
@@ -157,7 +199,7 @@ void OpenPGPHelper::decryptionFinished()
         }
         qDebug() << message;
         mimetic::MimeEntity me(message.begin(), message.end());
-        Common::LocalMessagePart *part = MimeEntityToPart(me);
+        Common::LocalMessagePart *part = mimeEntityToPart(me);
         QVector<Common::MessagePart*> children;
         for ( int i = 0; i < part->rowCount(); ++i ) {
             children.append(part->child(i, 0));

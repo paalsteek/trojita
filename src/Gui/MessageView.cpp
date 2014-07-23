@@ -397,12 +397,10 @@ void MessageView::handleMessageAvailable()
         netAccess->setExternalsEnabled(false);
         externalElements->hide();
 
-        netAccess->setModelMessage(message);
+        netAccess->setModelMessage(rootPartIndex);
 
         m_loadingItems.clear();
         m_loadingSpinner->stop();
-
-        QModelIndex rootPartIndex = messageModel->index(0, 0);
 
         PartWidgetFactory::PartLoadingOptions loadingMode;
         if (m_settings->value(Common::SettingsNames::guiPreferPlaintextRendering, QVariant(true)).toBool())

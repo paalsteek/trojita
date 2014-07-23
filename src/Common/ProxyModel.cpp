@@ -26,6 +26,7 @@
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/Model.h"
 #include "Imap/Model/MailboxTree.h"
+#include "Imap/Network/MsgPartNetAccessManager.h" //TODO: move pathToPart to a public location
 #include "Imap/Parser/Message.h"
 #include <QDebug>
 #include <QDateTime>
@@ -151,7 +152,7 @@ QVariant LocalMessagePart::data(int role) const
             return QString("%1: %2").arg(partId(), QString::fromLocal8Bit(m_mimetype));
     case Qt::ToolTipRole:
     {
-        return octets() > 10000 ? QString("%1 bytes of data").arg(octets()) : m_data;
+        return m_octets > 10000 ? QString("%1 bytes of data").arg(m_octets) : m_data;
     }
     }
 
@@ -190,32 +191,32 @@ QVariant LocalMessagePart::data(int role) const
         return m_data;
     case Imap::Mailbox::RolePartMimeType:
         return m_mimetype;
-    /*case Imap::Mailbox::RolePartCharset:
-        return charset();
+    case Imap::Mailbox::RolePartCharset:
+        return m_charset;
     case Imap::Mailbox::RolePartContentFormat:
-        return format();
+        return m_contentFormat;
     case Imap::Mailbox::RolePartContentDelSp:
-        return delsp();
+        return m_delSp;
     case Imap::Mailbox::RolePartEncoding:
-        return transferEncoding();
+        return m_encoding;
     case Imap::Mailbox::RolePartBodyFldId:
-        return bodyFldId();
+        return m_bodyFldId;
     case Imap::Mailbox::RolePartBodyDisposition:
-        return bodyDisposition();
+        return m_bodyDisposition;
     case Imap::Mailbox::RolePartFileName:
-        return filename();*/
+        return m_filename;
     case Imap::Mailbox::RolePartOctets:
-        return octets();
+        return m_octets;
     case Imap::Mailbox::RolePartId:
         return partId();
     case Imap::Mailbox::RolePartPathToPart:
         return pathToPart();
-    /*case Imap::Mailbox::RolePartMultipartRelatedMainCid:
-        if (relatedMainCid().isEmpty()) {
-            return relatedMainCid();
+    case Imap::Mailbox::RolePartMultipartRelatedMainCid:
+        if (m_multipartRelatedStartPart.isEmpty()) {
+            return m_multipartRelatedStartPart;
         } else {
             return QVariant();
-        }*/
+        }
     case Imap::Mailbox::RolePartIsTopLevelMultipart:
         return isTopLevelMultipart();
     case Imap::Mailbox::RolePartForceFetchFromCache:
@@ -235,8 +236,24 @@ MessageModel::MessageModel(QObject *parent, const QModelIndex &message)
     , m_rootPart(0)
     , m_factory(new MessagePartFactory(this))
 {
-    connect(message.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SIGNAL(dataChanged(QModelIndex,QModelIndex)));
+    connect(message.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(mapDataChanged(QModelIndex,QModelIndex)));
     m_factory->buildSubtree(message);
+}
+
+void MessageModel::mapDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
+{
+    QModelIndex root = index(0,0);
+    if (!root.isValid())
+        return;
+
+    //TODO: check whether out message is affected or not
+    qDebug() << "mapDataChanged" << topLeft.model() << "->" << Imap::Network::MsgPartNetAccessManager::pathToPart(root, topLeft.data(Imap::Mailbox::RolePartPathToPart).toString()).model();
+    QString tlPath = topLeft.data(Imap::Mailbox::RolePartPathToPart).toString();
+    QString brPath = bottomRight.data(Imap::Mailbox::RolePartPathToPart).toString();
+    emit dataChanged(
+                Imap::Network::MsgPartNetAccessManager::pathToPart(root, tlPath),
+                Imap::Network::MsgPartNetAccessManager::pathToPart(root, brPath)
+                );
 }
 
 MessageModel::~MessageModel()

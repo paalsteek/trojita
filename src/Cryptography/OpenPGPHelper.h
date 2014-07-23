@@ -25,6 +25,10 @@
 
 #include "Imap/Model/Model.h"
 
+namespace mimetic {
+class MimeEntity;
+}
+
 namespace Common {
 class MessagePart;
 class LocalMessagePart;
@@ -57,6 +61,8 @@ namespace Cryptography {
         QCA::OpenPGP *m_pgp;
 
         static QString qcaErrorStrings(int e);
+        static void storeInterestingFields(const mimetic::MimeEntity& me, Common::LocalMessagePart* part);
+        static Common::LocalMessagePart* mimeEntityToPart(const mimetic::MimeEntity& me);
     };
 }
 

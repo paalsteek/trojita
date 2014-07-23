@@ -98,8 +98,15 @@ public:
     void setFetchingState(FetchingState state) { m_state = state; }
     FetchingState getFetchingState() const { return m_state; }
 
+    void setCharset(const QString& charset) { m_charset = charset; }
+    void setContentFormat(const QString& format) { m_contentFormat = format; }
+    void setDelSp(const QString& delSp) { m_delSp = delSp; }
+    void setFilename(const QString& filename) { m_filename = filename; }
+    void setEncoding(const QByteArray& encoding) { m_encoding = encoding; }
+    void setBodyFldId(const QByteArray& bodyFldId) { m_bodyFldId = bodyFldId; }
+    void setBodyDisposition(const QByteArray& bodyDisposition) { m_bodyDisposition = bodyDisposition; }
+    void setMultipartRelatedStartPart(const QByteArray& startPart) { m_multipartRelatedStartPart = startPart; }
     void setOctets(int octets) { m_octets = octets; }
-    int octets() const { return m_octets; }
 
 private:
     bool isTopLevelMultipart() const;
@@ -108,9 +115,17 @@ private:
 
 protected:
     FetchingState m_state;
+    QString m_charset;
+    QString m_contentFormat;
+    QString m_delSp;
+    QString m_filename;
     QByteArray m_data;
     QByteArray m_mimetype;
-    int m_octets;
+    QByteArray m_encoding;
+    QByteArray m_bodyFldId;
+    QByteArray m_bodyDisposition;
+    QByteArray m_multipartRelatedStartPart;
+    uint m_octets;
 };
 
 class MessageModel: public QAbstractItemModel
@@ -131,6 +146,7 @@ public:
 
 public slots:
     void insertSubtree(const QModelIndex& parent, const QVector<Common::MessagePart*>& children);
+    void mapDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);
 
 protected:
     const QPersistentModelIndex m_message;
