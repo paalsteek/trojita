@@ -24,11 +24,8 @@
 #include "MessageModel.h"
 #include "Imap/Encoders.h"
 #include "Imap/Model/ItemRoles.h"
-#include "Imap/Model/Model.h"
 #include "Imap/Model/MailboxTree.h"
-#include "Imap/Parser/Message.h"
 #include <QDebug>
-#include <QDateTime>
 #include <QtGui/QFont>
 
 #include "Cryptography/OpenPGPHelper.h"
@@ -123,9 +120,6 @@ QString LocalMessagePart::partId() const
 }
 
 QString LocalMessagePart::pathToPart() const {
-    // This item is not directly fetcheable, so it does *not* make sense to ask for it.
-    // We cannot really assert at this point, though, because this function is published via the MVC interface.
-    //return QLatin1String("application-bug-dont-fetch-this");
     // TODO: do we need some way to prevent fetching of local parts?
     QString parentPath = QLatin1String("");
     if (parent()) {
@@ -305,6 +299,12 @@ int MessageModel::rowCount(const QModelIndex &parent) const
 QVariant MessageModel::data(const QModelIndex &index, int role) const
 {
     Q_ASSERT(index.isValid());
+
+    if ( role == Imap::Mailbox::RoleMessageUid
+         || role == Imap::Mailbox::RoleMailboxName
+         || role == Imap::Mailbox::RoleMailboxUidValidity ) {
+        return message().data(role);
+    }
 
     MessagePart* part = static_cast<MessagePart*>(index.internalPointer());
     Q_ASSERT(part);
