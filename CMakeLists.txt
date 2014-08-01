@@ -286,10 +286,8 @@ set(libCommon_SOURCES
     ${path_Common}/ConnectionId.cpp
     ${path_Common}/DeleteAfter.cpp
     ${path_Common}/FileLogger.cpp
-    ${path_Common}/MessagePartFactory.cpp
     ${path_Common}/MetaTypes.cpp
     ${path_Common}/Paths.cpp
-    ${path_Common}/ProxyModel.cpp
     ${path_Common}/SettingsNames.cpp
 )
 
@@ -343,6 +341,9 @@ set(libStreams_SOURCES
 
 set(path_Crypto ${CMAKE_CURRENT_SOURCE_DIR}/src/Cryptography)
 set(libCrypto_SOURCES
+    ${path_Crypto}/MessageModel.cpp
+    ${path_Crypto}/MessagePartFactory.cpp
+    ${path_Crypto}/QCAHelper.cpp
     ${path_Crypto}/OpenPGPHelper.cpp
     ${path_Crypto}/SMIMEHelper.cpp
 )

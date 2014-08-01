@@ -24,22 +24,34 @@
 #define CRYPTOGRAPHY_SMIMEHELPER_H_
 
 #include <QModelIndex>
+#include "QCAHelper.h"
 
 namespace QCA {
 class CMS;
 }
 
 namespace Cryptography {
-    class SMIMEHelper : public QObject {
+    class SMIMEHelper : public QCAHelper {
         Q_OBJECT
 
     public:
         SMIMEHelper(QObject* parent);
         ~SMIMEHelper();
+        void decrypt(const QModelIndex& parent);
 
-        void decrypt(const QModelIndex& parent) {}
+    signals:
+        void dataDecrypted(const QModelIndex& parent, const QVector<Cryptography::MessagePart*>& part);
+        void decryptionFailed(const QString& error);
+
+    private slots:
+        void handleDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);
+        void decryptionFinished();
+        void privateKeyLoaded();
+
     private:
+        QModelIndex m_partIndex;
         QCA::CMS *m_cms;
+        QCA::KeyLoader *m_loader;
     };
 }
 

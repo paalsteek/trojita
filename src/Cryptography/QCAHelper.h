@@ -20,33 +20,47 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef COMMON_MESSAGEPARTFACTORY_H
-#define COMMON_MESSAGEPARTFACTORY_H
+#ifndef CRYPTOGRAPHY_QCAHELPER_H_
+#define CRYPTOGRAPHY_QCAHELPER_H_
 
-#include <QObject>
+#include <QtCrypto/QtCrypto>
 
-class QModelIndex;
+namespace mimetic {
+class MimeEntity;
+class MailboxList;
+class AddressList;
+}
 
 namespace Cryptography {
-class OpenPGPHelper;
-}
-namespace Common {
-class MessageModel;
 class MessagePart;
+class LocalMessagePart;
+}
 
-class MessagePartFactory: public QObject {
+namespace Imap {
+namespace Message {
+class MailAddress;
+}
+}
+
+namespace Cryptography {
+class QCAHelper : public QObject {
     Q_OBJECT
+
 public:
-    MessagePartFactory(MessageModel* model);
+    QCAHelper(QObject *parent);
 
-public slots:
-    void buildSubtree(const QModelIndex& parent);
+protected slots:
+    void handleEventReady(int id, const QCA::Event &e);
 
-private:
-    void buildProxyTree(const QModelIndex& source, MessagePart* destination);
+protected:
+    static QString qcaErrorStrings(int e);
+    static void storeInterestingFields(const mimetic::MimeEntity& me, LocalMessagePart* part);
+    static LocalMessagePart* mimeEntityToPart(const mimetic::MimeEntity& me);
+    static QList<Imap::Message::MailAddress> mailboxListToQList(const mimetic::MailboxList& list);
+    static QList<Imap::Message::MailAddress> addressListToQList(const mimetic::AddressList& list);
 
-    MessageModel *m_model;
-    Cryptography::OpenPGPHelper *m_pgpHelper;
+    QCA::EventHandler _handler;
 };
 }
-#endif /* COMMON_MESSAGEPARTFACTORY_H */
+
+#endif /* CRYPTOGRAPHY_QCAHELPER_H_ */

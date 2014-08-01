@@ -222,6 +222,8 @@ void MultipartSignedWidget::rebuildWidgets()
         }
         layout->addWidget(m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions)));
     }
+    setLayout(layout);
+    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
 }
 
 QString MultipartSignedWidget::quoteMe() const
@@ -257,11 +259,20 @@ void GenericMultipartWidget::rebuildWidgets()
         QWidget *res = m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions));
         layout->addWidget(res);
     }
+    setLayout(layout);
+    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
 }
 
 QString GenericMultipartWidget::quoteMe() const
 {
     return quoteMeHelper(children());
+}
+
+MultipartEncryptedWidget::MultipartEncryptedWidget(QWidget *parent,
+        PartWidgetFactory *factory, const QModelIndex &partIndex,
+        const int recursionDepth, const PartWidgetFactory::PartLoadingOptions loadingOptions)
+    : GenericMultipartWidget(parent, factory, partIndex, recursionDepth, loadingOptions)
+{
 }
 
 Message822Widget::Message822Widget(QWidget *parent,
@@ -284,6 +295,7 @@ void Message822Widget::rebuildWidgets()
     delete l;
 
     QVBoxLayout *layout = new QVBoxLayout(this);
+    layout->setSizeConstraint(QLayout::SetNoConstraint);
     layout->setSpacing(0);
     layout->addWidget(m_envelope);
     for (int i = 0; i < m_partIndex.model()->rowCount(m_partIndex); ++i) {
@@ -295,6 +307,8 @@ void Message822Widget::rebuildWidgets()
         QWidget *res = m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions));
         layout->addWidget(res);
     }
+    setLayout(layout);
+    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
 }
 
 QString Message822Widget::quoteMe() const

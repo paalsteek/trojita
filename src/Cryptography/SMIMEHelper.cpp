@@ -20,25 +20,119 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <QFile>
+#include <mimetic/mimetic.h>
+
 #include "SMIMEHelper.h"
-
 #include "configure.cmake.h"
+#include "MessageModel.h"
+#include "Imap/Model/ItemRoles.h"
+#include "Imap/Model/MailboxTree.h"
 
-#ifdef TROJITA_HAVE_QCA
-#include <QtCrypto/QtCrypto>
-#endif /* TROJITA_HAVE_QCA */
 
 namespace Cryptography {
 SMIMEHelper::SMIMEHelper(QObject *parent)
-    : QObject(parent)
+    : QCAHelper(parent)
 #ifdef TROJITA_HAVE_QCA
     , m_cms(new QCA::CMS(this))
+    , m_loader(new QCA::KeyLoader(this))
 #endif /* TROJITA_HAVE_QCA */
 {
+    if (QCA::isSupported("pkcs12")) {
+        connect(m_loader, SIGNAL(finished()), this, SLOT(privateKeyLoaded()));
+        m_loader->loadKeyBundleFromFile("/home/stephan/platz_rhrk.uni-kl.de.p12");
+    }
 }
 
 SMIMEHelper::~SMIMEHelper()
 {
+}
+
+void SMIMEHelper::privateKeyLoaded()
+{
+    if ( m_loader->convertResult() == QCA::ConvertGood ) {
+        QCA::KeyBundle key = m_loader->keyBundle();
+        QCA::SecureMessageKey skey;
+        skey.setX509CertificateChain(key.certificateChain());
+        skey.setX509PrivateKey(key.privateKey());
+        QCA::SecureMessageKeyList skeys;
+        skeys += skey;
+        m_cms->setPrivateKeys(skeys);
+        // trigger decryption in case the key took longer to load then the data
+        handleDataChanged(QModelIndex(),QModelIndex());
+    } else {
+        emit decryptionFailed(tr("Unable to load S/MIME key"));
+    }
+}
+
+void SMIMEHelper::decrypt(const QModelIndex &parent)
+{
+#ifdef TROJITA_HAVE_QCA
+    if (QCA::isSupported("cms")) {
+        m_partIndex = parent;
+        QModelIndex origIndex = m_partIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
+        QModelIndex sourceIndex = origIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
+        Q_ASSERT(sourceIndex.isValid());
+        //Q_ASSERT(sourceIndex.model()->rowCount(sourceIndex) == 1);
+        connect(sourceIndex.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
+        //Trigger lazy loading of the required message parts
+        sourceIndex.data(Imap::Mailbox::RolePartData);
+        //call handleDataChanged at least once in case all parts are already available
+        handleDataChanged(QModelIndex(),QModelIndex());
+    } else
+#endif /* TROJITA_HAVE_QCA */
+    emit decryptionFailed(qcaErrorStrings(0));
+}
+
+void SMIMEHelper::handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+{
+#ifdef TROJITA_HAVE_QCA
+    Q_UNUSED(topLeft)
+    Q_UNUSED(bottomRight)
+    QModelIndex origIndex = m_partIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
+    QModelIndex sourceIndex = origIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
+    if ( sourceIndex.data(Imap::Mailbox::RoleIsFetched).toBool() && m_cms->privateKeys().size() > 0 )
+    {
+        disconnect(sourceIndex.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
+
+        QByteArray enc = sourceIndex.data(Imap::Mailbox::RolePartData).toByteArray();
+        enc.replace("\r\n", "\n");
+        qDebug() << enc;
+        QCA::Base64 dec;
+        dec.setLineBreaksEnabled(true);
+
+        QCA::SecureMessage* msg = new QCA::SecureMessage(m_cms);
+        connect(msg, SIGNAL(finished()), this, SLOT(decryptionFinished()));
+        msg->startDecrypt();
+        msg->update(dec.decode(enc).toByteArray());
+        msg->end();
+    }
+#endif /* TROJITA_HAVE_QCA */
+}
+
+void SMIMEHelper::decryptionFinished()
+{
+#ifdef TROJITA_HAVE_QCA
+    QCA::SecureMessage* msg = qobject_cast<QCA::SecureMessage*>(sender());
+    Q_ASSERT(msg);
+
+    if (!msg->success()) {
+        emit decryptionFailed(qcaErrorStrings(msg->errorCode()));
+        qDebug() << "Decryption Failed:" << qcaErrorStrings(msg->errorCode())
+                    << msg->diagnosticText();
+    } else {
+        QByteArray message;
+        while ( msg->bytesAvailable() )
+        {
+            message.append(msg->read());
+        }
+        mimetic::MimeEntity me(message.begin(), message.end());
+        LocalMessagePart *part = mimeEntityToPart(me);
+        QVector<MessagePart*> children;
+        children.append(part);
+        emit dataDecrypted(m_partIndex, children);
+    }
+#endif /* TROJITA_HAVE_QCA */
 }
 
 }

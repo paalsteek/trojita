@@ -24,17 +24,21 @@
 #include <QModelIndex>
 
 #include "MessagePartFactory.h"
-#include "ProxyModel.h"
+#include "MessageModel.h"
 #include "Cryptography/OpenPGPHelper.h"
+#include "Cryptography/SMIMEHelper.h"
 #include "Imap/Model/ItemRoles.h"
+#include "Imap/Model/MailboxTree.h"
 
-namespace Common {
+namespace Cryptography {
 
 MessagePartFactory::MessagePartFactory(MessageModel *model)
     : m_model(model)
     , m_pgpHelper(new Cryptography::OpenPGPHelper(this))
+    , m_cmsHelper(new Cryptography::SMIMEHelper(this))
 {
-    connect(m_pgpHelper, SIGNAL(dataDecrypted(QModelIndex,QVector<Common::MessagePart*>)), m_model, SLOT(insertSubtree(QModelIndex,QVector<Common::MessagePart*>)));
+    connect(m_pgpHelper, SIGNAL(dataDecrypted(QModelIndex,QVector<Cryptography::MessagePart*>)), m_model, SLOT(insertSubtree(QModelIndex,QVector<Cryptography::MessagePart*>)));
+    connect(m_cmsHelper, SIGNAL(dataDecrypted(QModelIndex,QVector<Cryptography::MessagePart*>)), m_model, SLOT(insertSubtree(QModelIndex,QVector<Cryptography::MessagePart*>)));
 }
 
 void MessagePartFactory::buildProxyTree(const QModelIndex& source, MessagePart *destination)
@@ -42,9 +46,13 @@ void MessagePartFactory::buildProxyTree(const QModelIndex& source, MessagePart *
     int i = 0;
     QModelIndex child = source.child(i, 0);
     while ( child.isValid() ) {
-        MessagePart* part = new ProxyMessagePart(destination, child);
+        MessagePart* part = new ProxyMessagePart(destination, child, m_model);
         buildProxyTree(child, part);
-        if ( child.data(Imap::Mailbox::RolePartMimeType).toString().compare("multipart/encrypted") ) {
+        QModelIndex rawChild = child.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
+        if (rawChild.isValid())
+            part->setRawPart(new ProxyMessagePart(part, rawChild, m_model));
+        if ( child.data(Imap::Mailbox::RolePartMimeType).toString().compare("multipart/encrypted")
+             && child.data(Imap::Mailbox::RolePartMimeType).toString().compare("application/pkcs7-mime") ) {
             destination->setChild(i, 0, part);
         } else {
             MessagePart* dummy = new LocalMessagePart(destination, child.data(Imap::Mailbox::RolePartMimeType).toByteArray());
@@ -57,14 +65,16 @@ void MessagePartFactory::buildProxyTree(const QModelIndex& source, MessagePart *
 
 void MessagePartFactory::buildSubtree(const QModelIndex &parent)
 {
-    if (parent.data(Imap::Mailbox::RolePartMimeType).toString().compare("multipart/encrypted") ) {
-        MessagePart* child = new ProxyMessagePart(0, parent);
+    if ( !parent.data(Imap::Mailbox::RolePartMimeType).toString().compare("multipart/encrypted") ) {
+        m_pgpHelper->decrypt(parent);
+    } else if ( !parent.data(Imap::Mailbox::RolePartMimeType).toString().compare("application/pkcs7-mime") ) {
+        m_cmsHelper->decrypt(parent);
+    } else {
+        MessagePart* child = new ProxyMessagePart(0, parent, m_model);
         buildProxyTree(parent, child);
         QVector<MessagePart*> children;
         children.append(child);
         m_model->insertSubtree(QModelIndex(), children);
-    } else {
-        m_pgpHelper->decrypt(parent);
     }
 }
 

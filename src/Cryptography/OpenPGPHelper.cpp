@@ -20,52 +20,22 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "OpenPGPHelper.h"
-
 #include <QDebug>
+#include <mimetic/mimetic.h>
 
+#include "OpenPGPHelper.h"
 #include "configure.cmake.h"
-#include "Common/ProxyModel.h"
-#include "Imap/Encoders.h"
+#include "MessageModel.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 
-#ifdef TROJITA_HAVE_MIMETIC
-#include <mimetic/mimetic.h>
-#endif /* TROJITA_HAVE_MIMETIC */
-
-#ifdef TROJITA_HAVE_QCA
-#include <QtCrypto/QtCrypto>
-#endif /* TROJITA_HAVE_QCA */
-
 namespace Cryptography {
-QString OpenPGPHelper::qcaErrorStrings(int e)
-{
-#ifdef TROJITA_HAVE_QCA
-    QMap<int, QString> map;
-    map[QCA::SecureMessage::ErrorPassphrase] = tr("passphrase was either wrong or not provided");
-    map[QCA::SecureMessage::ErrorFormat] = tr("input format was bad");
-    map[QCA::SecureMessage::ErrorSignerExpired] = tr("signing key is expired");
-    map[QCA::SecureMessage::ErrorSignerInvalid] = tr("signing key is invalid in some way");
-    map[QCA::SecureMessage::ErrorEncryptExpired] = tr("encrypting key is expired");
-    map[QCA::SecureMessage::ErrorEncryptUntrusted] = tr("encrypting key is untrusted");
-    map[QCA::SecureMessage::ErrorEncryptInvalid] = tr("encrypting key is invalid in some way");
-    map[QCA::SecureMessage::ErrorNeedCard] = tr("pgp card is missing");
-    map[QCA::SecureMessage::ErrorCertKeyMismatch] = tr("certificate and private key don't match");
-    map[QCA::SecureMessage::ErrorUnknown] = tr("other error");
-    return map[e];
-#else
-    Q_UNUSED(e);
-    return tr("Trojitá is missing support for OpenPGP.");
-#endif /* TROJITA_HAVE_QCA */
-}
-
 OpenPGPHelper::OpenPGPHelper(QObject *parent)
-    : QObject(parent)
+    : QCAHelper(parent)
     , m_partIndex()
 #ifdef TROJITA_HAVE_QCA
     , m_pgp(new QCA::OpenPGP(this))
-#endif /* TROJITA_HAVE_GNUPG */
+#endif /* TROJITA_HAVE_QCA */
 {
 }
 
@@ -119,68 +89,6 @@ void OpenPGPHelper::handleDataChanged(const QModelIndex &topLeft, const QModelIn
 #endif /* TROJITA_HAVE_QCA */
 }
 
-void OpenPGPHelper::storeInterestingFields(const mimetic::MimeEntity& me, Common::LocalMessagePart* part)
-{
-    part->setCharset(QString::fromStdString(me.header().contentType().param("charset")));
-    QString format = QString::fromStdString(me.header().contentType().param("format"));
-    if (!format.isEmpty()) {
-        part->setContentFormat(format);
-        part->setDelSp(QString::fromStdString(me.header().contentType().param("delsp")));
-    }
-    const mimetic::ContentDisposition& cd = me.header().contentDisposition();
-    QByteArray bodyDisposition(cd.type().c_str(), cd.type().size());
-    QString filename;
-    if (!bodyDisposition.isEmpty()) {
-        part->setBodyDisposition(bodyDisposition);
-        std::list<mimetic::ContentDisposition::Param> l = cd.paramList();
-        QMap<QByteArray, QByteArray> paramMap;
-        for (auto it = l.begin(); it != l.end(); ++it) {
-            const mimetic::ContentDisposition::Param& p = *it;
-            paramMap.insert(QByteArray(p.name().c_str(), p.name().size()), QByteArray(p.value().c_str(), p.value().size()));
-        }
-        filename = Imap::extractRfc2231Param(paramMap, "filename");
-    }
-    if (filename.isEmpty()) {
-        std::list<mimetic::ContentType::Param> l = me.header().contentType().paramList();
-        QMap<QByteArray, QByteArray> paramMap;
-        for (auto it = l.begin(); it != l.end(); ++it) {
-            const mimetic::ContentType::Param& p = *it;
-            paramMap.insert(QByteArray(p.name().c_str(), p.name().size()), QByteArray(p.value().c_str(), p.value().size()));
-        }
-        filename = Imap::extractRfc2231Param(paramMap, "name");
-    }
-
-    if (!filename.isEmpty()) {
-        part->setFilename(filename);
-    }
-
-    part->setEncoding(QByteArray(me.header().contentTransferEncoding().str().c_str(), me.header().contentTransferEncoding().str().size()));
-    part->setBodyFldId(QByteArray(me.header().contentId().str().c_str(), me.header().contentId().str().size()));
-}
-
-Common::LocalMessagePart* OpenPGPHelper::mimeEntityToPart(const mimetic::MimeEntity& me)
-{
-    QString type = QString(me.header().contentType().type().c_str());
-    QString subtype = QString(me.header().contentType().subtype().c_str());
-    Common::LocalMessagePart *part = new Common::LocalMessagePart(nullptr, QString("%1/%2").arg(type, subtype).toUtf8());
-    if (me.body().parts().size() > 0)
-    {
-        int i = 0;
-        Q_FOREACH(mimetic::MimeEntity* child, me.body().parts()) {
-            Common::LocalMessagePart *childPart = mimeEntityToPart(*child);
-            part->setChild(i++,0, childPart);
-        }
-    } else {
-        storeInterestingFields(me, part);
-        QByteArray data;
-        Imap::decodeContentTransferEncoding(QByteArray(me.body().data(), me.body().size()), part->data(Imap::Mailbox::RolePartEncoding).toByteArray(), &data);
-        part->setData(data);
-    }
-    part->setOctets(me.size());
-    part->setFetchingState(Common::LocalMessagePart::DONE);
-    return part;
-}
-
 void OpenPGPHelper::decryptionFinished()
 {
 #ifdef TROJITA_HAVE_QCA
@@ -199,8 +107,8 @@ void OpenPGPHelper::decryptionFinished()
         }
         qDebug() << message;
         mimetic::MimeEntity me(message.begin(), message.end());
-        Common::LocalMessagePart *part = mimeEntityToPart(me);
-        QVector<Common::MessagePart*> children;
+        LocalMessagePart *part = mimeEntityToPart(me);
+        QVector<MessagePart*> children;
         for ( int i = 0; i < part->rowCount(); ++i ) {
             children.append(part->child(i, 0));
         }

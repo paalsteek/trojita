@@ -20,38 +20,35 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CRYPTOGRAPHY_OPENPGPHELPER_H_
-#define CRYPTOGRAPHY_OPENPGPHELPER_H_
+#ifndef COMMON_MESSAGEPARTFACTORY_H
+#define COMMON_MESSAGEPARTFACTORY_H
 
-#include <QModelIndex>
-#include "QCAHelper.h"
+#include <QObject>
 
-namespace QCA {
-class OpenPGP;
-}
+class QModelIndex;
 
 namespace Cryptography {
-
-    class OpenPGPHelper : public QCAHelper {
-        Q_OBJECT
-
-    public:
-        OpenPGPHelper(QObject* parent);
-        ~OpenPGPHelper();
-        void decrypt(const QModelIndex& parent);
-
-    signals:
-        void dataDecrypted(const QModelIndex& parent, const QVector<MessagePart*>& part);
-        void decryptionFailed(const QString& error);
-
-    private slots:
-        void handleDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);
-        void decryptionFinished();
-
-    private:
-        QModelIndex m_partIndex;
-        QCA::OpenPGP *m_pgp;
-    };
+class OpenPGPHelper;
+class SMIMEHelper;
 }
+namespace Cryptography {
+class MessageModel;
+class MessagePart;
 
-#endif /* CRYPTOGRAPHY_OPENPGPHELPER_H_ */
+class MessagePartFactory: public QObject {
+    Q_OBJECT
+public:
+    MessagePartFactory(MessageModel* model);
+
+public slots:
+    void buildSubtree(const QModelIndex& parent);
+
+private:
+    void buildProxyTree(const QModelIndex& source, MessagePart* destination);
+
+    MessageModel *m_model;
+    Cryptography::OpenPGPHelper *m_pgpHelper;
+    Cryptography::SMIMEHelper *m_cmsHelper;
+};
+}
+#endif /* COMMON_MESSAGEPARTFACTORY_H */

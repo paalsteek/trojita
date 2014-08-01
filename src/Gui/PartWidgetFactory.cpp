@@ -75,6 +75,11 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
                                       loadingMode | PART_IGNORE_CLICKTHROUGH);
     }
 
+    // Check if we are dealing with encrypted data
+    if (!mimeType.compare("multipart/encrypted") || !mimeType.compare("application/pkcs7-mime")) {
+        return new MultipartEncryptedWidget(0, this, partIndex, recursionDepth, loadingMode);
+    }
+
     // Check whether we can render this MIME type at all
     QStringList allowedMimeTypes;
     allowedMimeTypes << QLatin1String("text/html") << QLatin1String("text/plain") << QLatin1String("image/jpeg") <<

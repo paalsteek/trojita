@@ -27,6 +27,7 @@
 #include "SimplePartWidget.h"
 #include "Common/MetaTypes.h"
 #include "Common/Paths.h"
+#include "Cryptography/MessageModel.h"
 #include "Gui/MessageView.h" // so that the compiler knows that it's a QObject
 #include "Gui/Util.h"
 #include "Imap/Encoders.h"

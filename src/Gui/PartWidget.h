@@ -102,7 +102,16 @@ protected:
     virtual void rebuildWidgets();
 };
 
-/** @short Message quoting support for generic multipart/ * */
+/** @short Support for encrypted messages */
+class MultipartEncryptedWidget: public GenericMultipartWidget
+{
+    Q_OBJECT
+public:
+    MultipartEncryptedWidget(QWidget *parent, PartWidgetFactory *factory, const QModelIndex &partIndex, const int recursionDepth,
+                             const PartWidgetFactory::PartLoadingOptions loadingOptions);
+};
+
+/** @short Message quoting support for message/822 MIME type */
 class Message822Widget: public QWidget, public AbstractMultipartWidget
 {
     Q_OBJECT

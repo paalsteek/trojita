@@ -38,7 +38,7 @@ class QTimer;
 class QUrl;
 class QWebView;
 
-namespace Common {
+namespace Cryptography {
 class MessageModel;
 }
 
@@ -120,7 +120,7 @@ private:
     QBoxLayout *layout;
     TagListWidget *tags;
     QPersistentModelIndex message;
-    Common::MessageModel *messageModel;
+    Cryptography::MessageModel *messageModel;
     Imap::Network::MsgPartNetAccessManager *netAccess;
     QPointer<Imap::Mailbox::NetworkWatcher> m_netWatcher;
     QTimer *markAsReadTimer;

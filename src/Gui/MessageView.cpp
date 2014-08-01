@@ -50,10 +50,10 @@
 #include "Window.h"
 #include "Common/InvokeMethod.h"
 #include "Common/MetaTypes.h"
-#include "Common/ProxyModel.h"
 #include "Common/SettingsNames.h"
 #include "Composer/QuoteText.h"
 #include "Composer/SubjectMangling.h"
+#include "Cryptography/MessageModel.h"
 #include "Imap/Model/MailboxTree.h"
 #include "Imap/Model/MsgListModel.h"
 #include "Imap/Model/NetworkWatcher.h"
@@ -201,7 +201,7 @@ void MessageView::setMessage(const QModelIndex &index)
         messageModel = 0;
     }
     if (!messageModel) {
-        messageModel = new Common::MessageModel(this, messageIndex);
+        messageModel = new Cryptography::MessageModel(this, messageIndex);
         connect(messageModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleMessageAvailable()));
         emit messageModelChanged(messageModel);
     }

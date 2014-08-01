@@ -27,6 +27,8 @@
 #include <QObject>
 #include <QPersistentModelIndex>
 
+#include <QDebug>
+
 #include "configure.cmake.h"
 
 #ifdef TROJITA_HAVE_MIMETIC
@@ -38,8 +40,15 @@ class OpenPGPHelper;
 class SMIMEHelper;
 }
 
-namespace Common {
+namespace Imap {
+namespace Message {
+class Envelope;
+}
+}
+
+namespace Cryptography {
 class MessagePartFactory;
+class MessageModel;
 
 class MessagePart
 {
@@ -49,7 +58,7 @@ public:
 
     MessagePart* parent() const { return m_parent; }
     const int row() const { return m_row; }
-    MessagePart* child(int row, int column) const; //TODO: handle and use column
+    MessagePart* child(int row, int column) const;
     int rowCount() const { return m_children.size(); }
 
     virtual QVariant data(int role) const = 0;
@@ -70,7 +79,7 @@ private:
 class ProxyMessagePart : public MessagePart
 {
 public:
-    ProxyMessagePart(MessagePart *parent, const QModelIndex &sourceIndex);
+    ProxyMessagePart(MessagePart *parent, const QModelIndex &sourceIndex, Cryptography::MessageModel *model);
     ~ProxyMessagePart();
 
     QVariant data(int role) const { return m_sourceIndex.data(role); }
@@ -107,6 +116,7 @@ public:
     void setBodyDisposition(const QByteArray& bodyDisposition) { m_bodyDisposition = bodyDisposition; }
     void setMultipartRelatedStartPart(const QByteArray& startPart) { m_multipartRelatedStartPart = startPart; }
     void setOctets(int octets) { m_octets = octets; }
+    void setEnvelope(Imap::Message::Envelope *envelope) { m_envelope = envelope; }
 
 private:
     bool isTopLevelMultipart() const;
@@ -114,6 +124,7 @@ private:
     QString pathToPart() const;
 
 protected:
+    Imap::Message::Envelope *m_envelope;
     FetchingState m_state;
     QString m_charset;
     QString m_contentFormat;
@@ -142,14 +153,17 @@ public:
     int columnCount(const QModelIndex &parent) const { return !m_rootPart ? 0 : 1; }
     QVariant data(const QModelIndex &index, int role) const;
 
-    QModelIndex message() { return m_message; }
+    QModelIndex message() const { return m_message; }
+
+    void addIndexMapping(QModelIndex source, MessagePart* destination) { m_map.insert(source, destination); }
 
 public slots:
-    void insertSubtree(const QModelIndex& parent, const QVector<Common::MessagePart*>& children);
+    void insertSubtree(const QModelIndex& parent, const QVector<Cryptography::MessagePart*>& children);
     void mapDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);
 
 protected:
     const QPersistentModelIndex m_message;
+    QHash<QModelIndex, MessagePart*> m_map;
     MessagePart *m_rootPart;
     MessagePartFactory *m_factory;
 };

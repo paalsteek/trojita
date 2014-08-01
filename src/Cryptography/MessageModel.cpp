@@ -21,15 +21,15 @@
 */
 
 #include "MessagePartFactory.h"
-#include "ProxyModel.h"
+#include "MessageModel.h"
 #include "Imap/Encoders.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/Model.h"
 #include "Imap/Model/MailboxTree.h"
-#include "Imap/Network/MsgPartNetAccessManager.h" //TODO: move pathToPart to a public location
 #include "Imap/Parser/Message.h"
 #include <QDebug>
 #include <QDateTime>
+#include <QtGui/QFont>
 
 #include "Cryptography/OpenPGPHelper.h"
 #include "Cryptography/SMIMEHelper.h"
@@ -38,7 +38,7 @@
 #include <QtCrypto/QtCrypto>
 #endif /* TROJITA_HAVE_QCA */
 
-namespace Common {
+namespace Cryptography {
 
 #ifdef TROJITA_HAVE_QCA
 QCA::Initializer init;
@@ -57,6 +57,11 @@ MessagePart::MessagePart(MessagePart *parent)
 MessagePart::~MessagePart()
 {
     // TODO: cleanup children/rawPart
+    Q_FOREACH(MessagePart* part, m_children) {
+        delete part;
+    }
+    if (m_rawPart)
+        delete m_rawPart;
 }
 
 MessagePart* MessagePart::child(int row, int column) const
@@ -88,10 +93,11 @@ void MessagePart::setRawPart(MessagePart *rawPart)
     m_rawPart = rawPart;
 }
 
-ProxyMessagePart::ProxyMessagePart(MessagePart *parent, const QModelIndex& sourceIndex)
+ProxyMessagePart::ProxyMessagePart(MessagePart *parent, const QModelIndex& sourceIndex, MessageModel* model)
     : MessagePart(parent)
     , m_sourceIndex(sourceIndex)
 {
+    model->addIndexMapping(sourceIndex, this);
 }
 
 ProxyMessagePart::~ProxyMessagePart()
@@ -100,6 +106,7 @@ ProxyMessagePart::~ProxyMessagePart()
 
 LocalMessagePart::LocalMessagePart(MessagePart *parent, const QByteArray& mimetype)
     : MessagePart(parent)
+    , m_envelope(0)
     , m_state(NONE)
     , m_mimetype(mimetype)
 {
@@ -154,35 +161,23 @@ QVariant LocalMessagePart::data(int role) const
     {
         return m_octets > 10000 ? QString("%1 bytes of data").arg(m_octets) : m_data;
     }
+    case Qt::FontRole:
+    {
+        QFont f;
+        f.setItalic(true);
+        return f;
+    }
     }
 
-    /*if (mimetype().toLower() == QLatin1String("message/rfc822")) {
+    if (m_mimetype.toLower() == QByteArray("message/rfc822")) {
         switch (role) {
         case Imap::Mailbox::RoleMessageEnvelope:
-            mimetic::Header h = (*(m_me->body().parts().begin()))->header();
-            QDateTime date = QDateTime::fromString(QString::fromStdString(h.field("date").value()));
-            QString subject = QString::fromStdString(h.subject());
-            QList<Imap::Message::MailAddress> from, sender, replyTo, to, cc, bcc;
-            from = mailboxListToQList(h.from());
-            if (h.hasField("sender")) {
-                sender.append(Imap::Message::MailAddress(
-                                  QString::fromStdString(h.sender().label()),
-                                  QString::fromStdString(h.sender().sourceroute()),
-                                  QString::fromStdString(h.sender().mailbox()),
-                                  QString::fromStdString(h.sender().domain())));
-            }
-            replyTo = addressListToQList(h.replyto());
-            to = addressListToQList(h.to());
-            cc = addressListToQList(h.cc());
-            bcc = addressListToQList(h.bcc());
-            QList<QByteArray> inReplyTo;
-            if (h.hasField("In-Reply-To")) {
-                inReplyTo.append(QByteArray(h.field("In-Reply-To").value().c_str(), h.field("In-Reply-To").value().length()));
-            }
-            QByteArray messageId = QByteArray::fromRawData(h.messageid().str().c_str(), h.messageid().str().length());
-            return QVariant::fromValue<Imap::Message::Envelope>(Imap::Message::Envelope(date, subject, from, sender, replyTo, to, cc, bcc, inReplyTo, messageId));
+            if (m_envelope)
+                return QVariant::fromValue<Imap::Message::Envelope>(*m_envelope);
+            else
+                return QVariant();
         }
-    }*/
+    }
 
     switch (role) {
     case Imap::Mailbox::RoleIsUnavailable:
@@ -246,14 +241,13 @@ void MessageModel::mapDataChanged(const QModelIndex& topLeft, const QModelIndex&
     if (!root.isValid())
         return;
 
-    //TODO: check whether out message is affected or not
-    qDebug() << "mapDataChanged" << topLeft.model() << "->" << Imap::Network::MsgPartNetAccessManager::pathToPart(root, topLeft.data(Imap::Mailbox::RolePartPathToPart).toString()).model();
-    QString tlPath = topLeft.data(Imap::Mailbox::RolePartPathToPart).toString();
-    QString brPath = bottomRight.data(Imap::Mailbox::RolePartPathToPart).toString();
-    emit dataChanged(
-                Imap::Network::MsgPartNetAccessManager::pathToPart(root, tlPath),
-                Imap::Network::MsgPartNetAccessManager::pathToPart(root, brPath)
-                );
+    Q_ASSERT(topLeft.parent() == bottomRight.parent());
+    if (m_map.contains(topLeft)) {
+        emit dataChanged(
+                    createIndex(topLeft.row(), topLeft.column(), m_map[topLeft]),
+                    createIndex(bottomRight.row(), bottomRight.column(), m_map[bottomRight])
+                    );
+    }
 }
 
 MessageModel::~MessageModel()
@@ -323,9 +317,9 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     return part->data(role);
 }
 
-void MessageModel::insertSubtree(const QModelIndex& parent, const QVector<Common::MessagePart *> &children)
+void MessageModel::insertSubtree(const QModelIndex& parent, const QVector<Cryptography::MessagePart *> &children)
 {
-    //Q_ASSERT(rowCount(parent) == 0);
+    Q_ASSERT(rowCount(parent) == 0);
     beginInsertRows(parent, 0, children.size());
     if (parent.isValid()) {
         MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
