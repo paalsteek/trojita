@@ -40,7 +40,6 @@ SMIMEHelper::SMIMEHelper(QObject *parent)
 {
     if (QCA::isSupported("pkcs12")) {
         connect(m_loader, SIGNAL(finished()), this, SLOT(privateKeyLoaded()));
-        m_loader->loadKeyBundleFromFile("/home/stephan/platz_rhrk.uni-kl.de.p12");
     }
 }
 
@@ -69,11 +68,15 @@ void SMIMEHelper::decrypt(const QModelIndex &parent)
 {
 #ifdef TROJITA_HAVE_QCA
     if (QCA::isSupported("cms")) {
+        if ( m_cms->privateKeys().size() == 0 ) {
+            // TODO: make this configurable
+            m_loader->loadKeyBundleFromFile("");
+        }
+
         m_partIndex = parent;
         QModelIndex origIndex = m_partIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
         QModelIndex sourceIndex = origIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
         Q_ASSERT(sourceIndex.isValid());
-        //Q_ASSERT(sourceIndex.model()->rowCount(sourceIndex) == 1);
         connect(sourceIndex.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
         //Trigger lazy loading of the required message parts
         sourceIndex.data(Imap::Mailbox::RolePartData);
@@ -97,7 +100,6 @@ void SMIMEHelper::handleDataChanged(const QModelIndex &topLeft, const QModelInde
 
         QByteArray enc = sourceIndex.data(Imap::Mailbox::RolePartData).toByteArray();
         enc.replace("\r\n", "\n");
-        qDebug() << enc;
         QCA::Base64 dec;
         dec.setLineBreaksEnabled(true);
 
