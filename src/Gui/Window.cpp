@@ -655,8 +655,8 @@ void MainWindow::createWidgets()
     taskTree->setHeaderHidden(true);
     taskDock->setWidget(taskTree);
     addDockWidget(Qt::LeftDockWidgetArea, taskDock);
-    mailDock = new QDockWidget("Mail Tree", this);
-    mailDock->setObjectName("mailDock");
+    mailDock = new QDockWidget(tr("Mail Tree"), this);
+    mailDock->setObjectName(QLatin1String("mailDock"));
     mailTree = new QTreeView(mailDock);
     mailDock->hide();
     mailTree->setUniformRowHeights(true);

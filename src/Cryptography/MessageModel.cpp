@@ -34,17 +34,7 @@
 #include "Cryptography/OpenPGPHelper.h"
 #include "Cryptography/SMIMEHelper.h"
 
-#ifdef TROJITA_HAVE_QCA
-#include <QtCrypto/QtCrypto>
-#endif /* TROJITA_HAVE_QCA */
-
 namespace Cryptography {
-
-#ifdef TROJITA_HAVE_QCA
-QCA::Initializer init;
-#endif /* TROJITA_HAVE_QCA */
-
-//TODO: handling of special columns
 
 MessagePart::MessagePart(MessagePart *parent)
     : m_parent(parent)
@@ -56,7 +46,6 @@ MessagePart::MessagePart(MessagePart *parent)
 
 MessagePart::~MessagePart()
 {
-    // TODO: cleanup children/rawPart
     Q_FOREACH(MessagePart* part, m_children) {
         delete part;
     }
@@ -184,6 +173,14 @@ QVariant LocalMessagePart::data(int role) const
         return m_state == UNAVAILABLE;
     case Imap::Mailbox::RolePartData:
         return m_data;
+    case Imap::Mailbox::RolePartUnicodeText:
+    {
+        if (m_mimetype.startsWith("text/")) {
+            return Imap::decodeByteArray(m_data, m_charset.toLocal8Bit());
+        } else {
+            return QVariant();
+        }
+    }
     case Imap::Mailbox::RolePartMimeType:
         return m_mimetype;
     case Imap::Mailbox::RolePartCharset:
@@ -217,8 +214,6 @@ QVariant LocalMessagePart::data(int role) const
     case Imap::Mailbox::RolePartForceFetchFromCache:
         return QVariant(); // Nothing to do here
     default:
-        qDebug() << "Unknown Role requested:" << role << "(base:" << Imap::Mailbox::RoleBase << ")";
-        //Q_ASSERT(0); // unknown role
         break;
     }
 

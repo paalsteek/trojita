@@ -76,7 +76,8 @@ QWidget *PartWidgetFactory::create(const QModelIndex &partIndex, int recursionDe
     }
 
     // Check if we are dealing with encrypted data
-    if (!mimeType.compare("multipart/encrypted") || !mimeType.compare("application/pkcs7-mime")) {
+    if (!mimeType.compare(QLatin1String("multipart/encrypted"))
+            || !mimeType.compare(QLatin1String("application/pkcs7-mime"))) {
         return new MultipartEncryptedWidget(0, this, partIndex, recursionDepth, loadingMode);
     }
 

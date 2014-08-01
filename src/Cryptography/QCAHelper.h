@@ -59,6 +59,7 @@ protected:
     static QList<Imap::Message::MailAddress> mailboxListToQList(const mimetic::MailboxList& list);
     static QList<Imap::Message::MailAddress> addressListToQList(const mimetic::AddressList& list);
 
+    QCA::Initializer _init;
     QCA::EventHandler _handler;
 };
 }

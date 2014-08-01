@@ -41,7 +41,7 @@ namespace Cryptography {
         void decrypt(const QModelIndex& parent);
 
     signals:
-        void dataDecrypted(const QModelIndex& parent, const QVector<MessagePart*>& part);
+        void dataDecrypted(const QModelIndex& parent, const QVector<Cryptography::MessagePart*>& part);
         void decryptionFailed(const QString& error);
 
     private slots:
