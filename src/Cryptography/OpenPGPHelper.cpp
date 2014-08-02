@@ -20,11 +20,12 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <QDebug>
+#include "configure.cmake.h"
+#ifdef TROJITA_HAVE_MIMETIC
 #include <mimetic/mimetic.h>
+#endif /* TROJITA_HAVE_MIMETIC */
 
 #include "OpenPGPHelper.h"
-#include "configure.cmake.h"
 #include "MessageModel.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
@@ -33,9 +34,7 @@ namespace Cryptography {
 OpenPGPHelper::OpenPGPHelper(QObject *parent)
     : QCAHelper(parent)
     , m_partIndex()
-#ifdef TROJITA_HAVE_QCA
     , m_pgp(new QCA::OpenPGP(this))
-#endif /* TROJITA_HAVE_QCA */
 {
 }
 
@@ -45,7 +44,6 @@ OpenPGPHelper::~OpenPGPHelper()
 
 void OpenPGPHelper::decrypt(const QModelIndex &parent)
 {
-#ifdef TROJITA_HAVE_QCA
     if (QCA::isSupported("openpgp")) {
         m_partIndex = parent;
         QModelIndex sourceIndex = m_partIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
@@ -58,13 +56,11 @@ void OpenPGPHelper::decrypt(const QModelIndex &parent)
         //call handleDataChanged at least once in case all parts are already available
         handleDataChanged(QModelIndex(),QModelIndex());
     } else
-#endif /* TROJITA_HAVE_QCA */
-    emit decryptionFailed(qcaErrorStrings(0));
+        emit decryptionFailed(qcaErrorStrings(0));
 }
 
 void OpenPGPHelper::handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
-#ifdef TROJITA_HAVE_QCA
     Q_UNUSED(topLeft)
     Q_UNUSED(bottomRight)
     QModelIndex sourceIndex = m_partIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
@@ -86,12 +82,10 @@ void OpenPGPHelper::handleDataChanged(const QModelIndex &topLeft, const QModelIn
         msg->update(encIndex.data(Imap::Mailbox::RolePartData).toByteArray().data());
         msg->end();
     }
-#endif /* TROJITA_HAVE_QCA */
 }
 
 void OpenPGPHelper::decryptionFinished()
 {
-#ifdef TROJITA_HAVE_QCA
     QCA::SecureMessage* msg = qobject_cast<QCA::SecureMessage*>(sender());
     Q_ASSERT(msg);
 
@@ -105,16 +99,19 @@ void OpenPGPHelper::decryptionFinished()
         {
             message.append(msg->read());
         }
-        qDebug() << message;
+#ifdef TROJITA_HAVE_MIMETIC
         mimetic::MimeEntity me(message.begin(), message.end());
         LocalMessagePart *part = mimeEntityToPart(me);
+#else
+        LocalMessagePart *part = new LocalMessagePart(0, "text/plain");
+        part->setData(message);
+#endif /* TROJITA_HAVE_MIMETIC */
         QVector<MessagePart*> children;
         for ( int i = 0; i < part->rowCount(); ++i ) {
             children.append(part->child(i, 0));
         }
         emit dataDecrypted(m_partIndex, children);
     }
-#endif /* TROJITA_HAVE_QCA */
 }
 
 }

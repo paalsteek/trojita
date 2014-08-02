@@ -20,10 +20,12 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "configure.cmake.h"
+#ifdef TROJITA_HAVE_MIMETIC
 #include <mimetic/mimetic.h>
+#endif /* TROJITA_HAVE_MIMETIC */
 
 #include "QCAHelper.h"
-#include "configure.cmake.h"
 #include "MessageModel.h"
 #include "Imap/Encoders.h"
 #include "Imap/Model/ItemRoles.h"
@@ -73,6 +75,7 @@ void QCAHelper::handleEventReady(int id, const QCA::Event &e)
     }
 }
 
+#ifdef TROJITA_HAVE_MIMETIC
 void QCAHelper::storeInterestingFields(const mimetic::MimeEntity& me, LocalMessagePart* part)
 {
     part->setCharset(QString::fromStdString(me.header().contentType().param("charset")));
@@ -197,5 +200,6 @@ LocalMessagePart* QCAHelper::mimeEntityToPart(const mimetic::MimeEntity& me)
     part->setFetchingState(LocalMessagePart::DONE);
     return part;
 }
+#endif /* TROJITA_HAVE_MIMETIC */
 
 }

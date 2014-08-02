@@ -29,12 +29,6 @@
 
 #include <QDebug>
 
-#include "configure.cmake.h"
-
-#ifdef TROJITA_HAVE_MIMETIC
-#include <mimetic/mimetic.h>
-#endif /* TROJITA_HAVE_MIMETIC */
-
 namespace Cryptography {
 class OpenPGPHelper;
 class SMIMEHelper;

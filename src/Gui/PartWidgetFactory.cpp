@@ -45,8 +45,6 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 
-#include <QDebug>
-
 namespace Gui
 {
 

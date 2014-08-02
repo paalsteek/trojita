@@ -70,7 +70,7 @@ trojita_option(WITH_SHARED_PLUGINS "Enable shared dynamic plugins" ON "NOT UBUNT
 trojita_option(WITH_TESTS "Build tests" ON "NOT WITH_HARMATTAN")
 trojita_option(DEV_FATAL_WARNINGS "Turn build warnings into errors (developers only)" OFF)
 trojita_option(WITH_MIMETIC "Build with MIME parser" AUTO)
-trojita_option(WITH_QCA "Build with Qt Cryptographic Architecture" AUTO "WITH_MIMETIC")
+trojita_option(WITH_QCA "Build with Qt Cryptographic Architecture" AUTO)
 
 if(WIN32)
     trojita_option(WITH_NSIS "Build Windows NSIS installer" AUTO)
@@ -343,10 +343,15 @@ set(path_Crypto ${CMAKE_CURRENT_SOURCE_DIR}/src/Cryptography)
 set(libCrypto_SOURCES
     ${path_Crypto}/MessageModel.cpp
     ${path_Crypto}/MessagePartFactory.cpp
-    ${path_Crypto}/QCAHelper.cpp
-    ${path_Crypto}/OpenPGPHelper.cpp
-    ${path_Crypto}/SMIMEHelper.cpp
 )
+if(WITH_QCA)
+    set(libCrypto_SOURCES
+        ${libCrypto_SOURCES}
+        ${path_Crypto}/QCAHelper.cpp
+        ${path_Crypto}/OpenPGPHelper.cpp
+        ${path_Crypto}/SMIMEHelper.cpp
+    )
+endif()
 
 if(WITH_ZLIB)
     set(libStreams_SOURCES ${libStreams_SOURCES}

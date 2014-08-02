@@ -20,11 +20,14 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "configure.cmake.h"
+
 #include <QFile>
+#ifdef TROJITA_HAVE_MIMETIC
 #include <mimetic/mimetic.h>
+#endif /* TROJITA_HAVE_MIMETIC */
 
 #include "SMIMEHelper.h"
-#include "configure.cmake.h"
 #include "MessageModel.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
@@ -33,10 +36,8 @@
 namespace Cryptography {
 SMIMEHelper::SMIMEHelper(QObject *parent)
     : QCAHelper(parent)
-#ifdef TROJITA_HAVE_QCA
     , m_cms(new QCA::CMS(this))
     , m_loader(new QCA::KeyLoader(this))
-#endif /* TROJITA_HAVE_QCA */
 {
     if (QCA::isSupported("pkcs12")) {
         connect(m_loader, SIGNAL(finished()), this, SLOT(privateKeyLoaded()));
@@ -66,7 +67,6 @@ void SMIMEHelper::privateKeyLoaded()
 
 void SMIMEHelper::decrypt(const QModelIndex &parent)
 {
-#ifdef TROJITA_HAVE_QCA
     if (QCA::isSupported("cms")) {
         if ( m_cms->privateKeys().size() == 0 ) {
             // TODO: make this configurable
@@ -83,13 +83,11 @@ void SMIMEHelper::decrypt(const QModelIndex &parent)
         //call handleDataChanged at least once in case all parts are already available
         handleDataChanged(QModelIndex(),QModelIndex());
     } else
-#endif /* TROJITA_HAVE_QCA */
-    emit decryptionFailed(qcaErrorStrings(0));
+        emit decryptionFailed(qcaErrorStrings(0));
 }
 
 void SMIMEHelper::handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
-#ifdef TROJITA_HAVE_QCA
     Q_UNUSED(topLeft)
     Q_UNUSED(bottomRight)
     QModelIndex origIndex = m_partIndex.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
@@ -109,12 +107,10 @@ void SMIMEHelper::handleDataChanged(const QModelIndex &topLeft, const QModelInde
         msg->update(dec.decode(enc).toByteArray());
         msg->end();
     }
-#endif /* TROJITA_HAVE_QCA */
 }
 
 void SMIMEHelper::decryptionFinished()
 {
-#ifdef TROJITA_HAVE_QCA
     QCA::SecureMessage* msg = qobject_cast<QCA::SecureMessage*>(sender());
     Q_ASSERT(msg);
 
@@ -128,13 +124,17 @@ void SMIMEHelper::decryptionFinished()
         {
             message.append(msg->read());
         }
+#ifdef TROJITA_HAVE_MIMETIC
         mimetic::MimeEntity me(message.begin(), message.end());
         LocalMessagePart *part = mimeEntityToPart(me);
+#else
+        LocalMessagePart *part = new LocalMessagePart(0, "text/plain");
+        part->setData(message);
+#endif /* TROJITA_HAVE_MIMETIC */
         QVector<MessagePart*> children;
         children.append(part);
         emit dataDecrypted(m_partIndex, children);
     }
-#endif /* TROJITA_HAVE_QCA */
 }
 
 }

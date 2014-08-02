@@ -223,7 +223,7 @@ void MultipartSignedWidget::rebuildWidgets()
         layout->addWidget(m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions)));
     }
     setLayout(layout);
-    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 QString MultipartSignedWidget::quoteMe() const
@@ -260,7 +260,7 @@ void GenericMultipartWidget::rebuildWidgets()
         layout->addWidget(res);
     }
     setLayout(layout);
-    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 QString GenericMultipartWidget::quoteMe() const
@@ -308,7 +308,7 @@ void Message822Widget::rebuildWidgets()
         layout->addWidget(res);
     }
     setLayout(layout);
-    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 QString Message822Widget::quoteMe() const

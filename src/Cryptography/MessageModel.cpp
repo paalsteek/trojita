@@ -25,11 +25,7 @@
 #include "Imap/Encoders.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
-#include <QDebug>
 #include <QtGui/QFont>
-
-#include "Cryptography/OpenPGPHelper.h"
-#include "Cryptography/SMIMEHelper.h"
 
 namespace Cryptography {
 
@@ -314,9 +310,9 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
 
 void MessageModel::insertSubtree(const QModelIndex& parent, const QVector<Cryptography::MessagePart *> &children)
 {
-    Q_ASSERT(rowCount(parent) == 0);
     beginInsertRows(parent, 0, children.size());
     if (parent.isValid()) {
+        Q_ASSERT(rowCount(parent) == 0);
         MessagePart* part = static_cast<MessagePart*>(parent.internalPointer());
         Q_ASSERT(part);
         for (int i = 0; i < children.size(); ++i) {
@@ -326,6 +322,7 @@ void MessageModel::insertSubtree(const QModelIndex& parent, const QVector<Crypto
         if (localPart)
             localPart->setFetchingState(LocalMessagePart::DONE);
     } else {
+        Q_ASSERT(!m_rootPart);
         m_rootPart = children.first();
     }
     endInsertRows();

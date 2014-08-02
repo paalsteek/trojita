@@ -22,7 +22,6 @@
 #ifndef VIEW_MESSAGEVIEW_H
 #define VIEW_MESSAGEVIEW_H
 
-#include <QMutex>
 #include <QPersistentModelIndex>
 #include <QPointer>
 #include <QSet>
