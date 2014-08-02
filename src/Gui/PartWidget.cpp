@@ -72,15 +72,7 @@ MultipartAlternativeWidget::MultipartAlternativeWidget(QWidget *parent,
     QTabWidget(parent),
     AbstractMultipartWidget(factory, partIndex, recursionDepth, options)
 {
-    connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
     setContentsMargins(0,0,0,0);
-
-    rebuildWidgets();
-}
-
-void MultipartAlternativeWidget::rebuildWidgets()
-{
-    // TODO: clean up existing layouts
 
     const bool plaintextIsPreferred = m_loadingOptions & PartWidgetFactory::PART_PREFER_PLAINTEXT_OVER_HTML;
 
@@ -284,13 +276,6 @@ Message822Widget::Message822Widget(QWidget *parent,
     m_envelope = new EnvelopeView(0, m_factory->messageView());
     m_envelope->setMessage(m_partIndex);
 
-    connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
-
-    rebuildWidgets();
-}
-
-void Message822Widget::rebuildWidgets()
-{
     QLayout *l = layout();
     delete l;
 
@@ -308,7 +293,6 @@ void Message822Widget::rebuildWidgets()
         layout->addWidget(res);
     }
     setLayout(layout);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 QString Message822Widget::quoteMe() const
@@ -344,10 +328,8 @@ IMPL_RELOAD(Message822Widget);
     }\
 }
 
-IMPL_ROWSINSERTED(MultipartAlternativeWidget);
 IMPL_ROWSINSERTED(MultipartSignedWidget);
 IMPL_ROWSINSERTED(GenericMultipartWidget);
-IMPL_ROWSINSERTED(Message822Widget);
 
 #undef IMPL_ROWSINSERTED
 }

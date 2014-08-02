@@ -42,7 +42,6 @@ public:
                                const int recursionDepth, const PartWidgetFactory::PartLoadingOptions options);
 
 protected:
-    virtual void rebuildWidgets() = 0;
     PartWidgetFactory *m_factory;
     const QPersistentModelIndex m_partIndex;
     const int m_recursionDepth;
@@ -60,11 +59,7 @@ public:
     virtual QString quoteMe() const;
     virtual void reloadContents();
 
-protected slots:
-    void handleRowsInserted(QModelIndex parent, int first, int last);
-
 protected:
-    virtual void rebuildWidgets();
     bool eventFilter(QObject *o, QEvent *e);
 };
 
@@ -120,12 +115,6 @@ public:
                      const PartWidgetFactory::PartLoadingOptions loadingOptions);
     virtual QString quoteMe() const;
     virtual void reloadContents();
-
-protected slots:
-    void handleRowsInserted(QModelIndex parent, int first, int last);
-
-protected:
-    virtual void rebuildWidgets();
 
 private:
     EnvelopeView* m_envelope;
