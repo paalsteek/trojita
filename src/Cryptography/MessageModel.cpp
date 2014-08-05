@@ -312,6 +312,9 @@ MessageModel::MessageModel(QObject *parent, const QModelIndex &message)
     , m_rootPart(0)
     , m_factory(new MessagePartFactory(this))
 {
+    // Make sure the message structure is loaded
+    Q_ASSERT(m_message.model()->rowCount(m_message) > 0);
+
     connect(message.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(mapDataChanged(QModelIndex,QModelIndex)));
     m_factory->buildSubtree(message);
 }

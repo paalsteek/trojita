@@ -35,15 +35,23 @@ namespace Cryptography {
 class MessageModel;
 class MessagePart;
 
+/** @short Factory to populate a MessageModel with all remote message parts,
+ * decrypt encrypted messages and add the decrypted content to the MessageModel
+ */
 class MessagePartFactory: public QObject {
     Q_OBJECT
 public:
     MessagePartFactory(MessageModel* model);
 
 public slots:
+    /** @short Build a subtree of either ProxyMessageParts for an existing message
+     * or of LocalMessageParts after decrypting an encrypted message and add that
+     * tree to our MessageModel
+     */
     void buildSubtree(const QModelIndex& parent);
 
 private:
+    /** @short Build the tree of ProxyMessageParts for a given message */
     void buildProxyTree(const QModelIndex& source, MessagePart* destination);
 
     MessageModel *m_model;

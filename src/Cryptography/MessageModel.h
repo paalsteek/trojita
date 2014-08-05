@@ -134,6 +134,7 @@ protected:
     uint m_octets;
 };
 
+/** @short A model for a single message including raw and possibly decrypted message parts */
 class MessageModel: public QAbstractItemModel
 {
     Q_OBJECT
@@ -150,6 +151,9 @@ public:
 
     QModelIndex message() const;
 
+    /** @short Adds a mapping from a source QModelIndex to a MessagePart
+     * to support handling of signals from the original model
+     */
     void addIndexMapping(QModelIndex source, MessagePart* destination);
 
 public slots:
