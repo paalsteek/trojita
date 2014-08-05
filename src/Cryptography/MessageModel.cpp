@@ -46,6 +46,21 @@ MessagePart::~MessagePart()
         delete m_rawPart;
 }
 
+MessagePart* MessagePart::parent() const
+{
+    return m_parent;
+}
+
+const int MessagePart::row() const
+{
+    return m_row;
+}
+
+int MessagePart::rowCount() const
+{
+    return m_children.size();
+}
+
 MessagePart* MessagePart::child(int row, int column) const
 {
     if ( column == Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS ) {
@@ -69,6 +84,16 @@ void MessagePart::setChild(int row, int column, MessagePart *part)
     part->setRow(row);
 }
 
+void MessagePart::setRow(int row)
+{
+    m_row = row;
+}
+
+void MessagePart::setParent(MessagePart *parent)
+{
+    m_parent = parent;
+}
+
 void MessagePart::setRawPart(MessagePart *rawPart)
 {
     Q_ASSERT(!m_rawPart);
@@ -86,6 +111,11 @@ ProxyMessagePart::~ProxyMessagePart()
 {
 }
 
+QVariant ProxyMessagePart::data(int role) const
+{
+    return m_sourceIndex.data(role);
+}
+
 LocalMessagePart::LocalMessagePart(MessagePart *parent, const QByteArray& mimetype)
     : MessagePart(parent)
     , m_envelope(0)
@@ -96,6 +126,72 @@ LocalMessagePart::LocalMessagePart(MessagePart *parent, const QByteArray& mimety
 
 LocalMessagePart::~LocalMessagePart()
 {
+}
+
+void LocalMessagePart::setData(const QByteArray &data)
+{
+    m_data = data;
+    m_state = DONE;
+}
+
+void LocalMessagePart::setFetchingState(FetchingState state)
+{
+    m_state = state;
+}
+
+LocalMessagePart::FetchingState LocalMessagePart::getFetchingState() const
+{
+    return m_state;
+}
+
+void LocalMessagePart::setCharset(const QString &charset)
+{
+    m_charset = charset;
+}
+
+void LocalMessagePart::setContentFormat(const QString &format)
+{
+    m_contentFormat = format;
+}
+
+void LocalMessagePart::setDelSp(const QString &delSp)
+{
+    m_delSp = delSp;
+}
+
+void LocalMessagePart::setFilename(const QString &filename)
+{
+    m_filename = filename;
+}
+
+void LocalMessagePart::setEncoding(const QByteArray &encoding)
+{
+    m_encoding = encoding;
+}
+
+void LocalMessagePart::setBodyFldId(const QByteArray &bodyFldId)
+{
+    m_bodyFldId = bodyFldId;
+}
+
+void LocalMessagePart::setBodyDisposition(const QByteArray &bodyDisposition)
+{
+    m_bodyDisposition = bodyDisposition;
+}
+
+void LocalMessagePart::setMultipartRelatedStartPart(const QByteArray &startPart)
+{
+    m_multipartRelatedStartPart = startPart;
+}
+
+void LocalMessagePart::setOctets(int octets)
+{
+    m_octets = octets;
+}
+
+void LocalMessagePart::setEnvelope(Imap::Message::Envelope *envelope)
+{
+    m_envelope = envelope;
 }
 
 bool LocalMessagePart::isTopLevelMultipart() const
@@ -292,6 +388,12 @@ int MessageModel::rowCount(const QModelIndex &parent) const
     return count;
 }
 
+int MessageModel::columnCount(const QModelIndex &parent) const
+{
+    Q_UNUSED(parent);
+    return !m_rootPart ? 0 : 1;
+}
+
 QVariant MessageModel::data(const QModelIndex &index, int role) const
 {
     Q_ASSERT(index.isValid());
@@ -306,6 +408,15 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     Q_ASSERT(part);
 
     return part->data(role);
+}
+
+QModelIndex MessageModel::message() const {
+     return m_message;
+}
+
+void MessageModel::addIndexMapping(QModelIndex source, MessagePart *destination)
+{
+    m_map.insert(source, destination);
 }
 
 void MessageModel::insertSubtree(const QModelIndex& parent, const QVector<Cryptography::MessagePart *> &children)

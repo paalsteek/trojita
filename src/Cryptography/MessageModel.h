@@ -50,16 +50,16 @@ public:
     MessagePart(MessagePart *parent);
     virtual ~MessagePart();
 
-    MessagePart* parent() const { return m_parent; }
-    const int row() const { return m_row; }
+    MessagePart* parent() const;
+    const int row() const;
     MessagePart* child(int row, int column) const;
-    int rowCount() const { return m_children.size(); }
+    int rowCount() const;
 
     virtual QVariant data(int role) const = 0;
 
     void setChild(int row, int column, MessagePart* part);
-    void setRow(int row) { m_row = row; }
-    void setParent(MessagePart *parent) { m_parent = parent; }
+    void setRow(int row);
+    void setParent(MessagePart *parent);
 
     void setRawPart(MessagePart *rawPart);
 
@@ -76,7 +76,7 @@ public:
     ProxyMessagePart(MessagePart *parent, const QModelIndex &sourceIndex, Cryptography::MessageModel *model);
     ~ProxyMessagePart();
 
-    QVariant data(int role) const { return m_sourceIndex.data(role); }
+    QVariant data(int role) const;
 
 private:
     QPersistentModelIndex m_sourceIndex;
@@ -92,25 +92,26 @@ public:
         LOADING, /**< @short Decryption/Loading of an item is already scheduled */
         DONE /**< @short Item is available right now */
     };
+
     LocalMessagePart(MessagePart *parent, const QByteArray &mimetype);
     ~LocalMessagePart();
 
     QVariant data(int role) const;
 
-    void setData(const QByteArray& data) { m_data = data; m_state = DONE; }
-    void setFetchingState(FetchingState state) { m_state = state; }
-    FetchingState getFetchingState() const { return m_state; }
+    void setData(const QByteArray& data);
+    void setFetchingState(FetchingState state);
+    FetchingState getFetchingState() const;
 
-    void setCharset(const QString& charset) { m_charset = charset; }
-    void setContentFormat(const QString& format) { m_contentFormat = format; }
-    void setDelSp(const QString& delSp) { m_delSp = delSp; }
-    void setFilename(const QString& filename) { m_filename = filename; }
-    void setEncoding(const QByteArray& encoding) { m_encoding = encoding; }
-    void setBodyFldId(const QByteArray& bodyFldId) { m_bodyFldId = bodyFldId; }
-    void setBodyDisposition(const QByteArray& bodyDisposition) { m_bodyDisposition = bodyDisposition; }
-    void setMultipartRelatedStartPart(const QByteArray& startPart) { m_multipartRelatedStartPart = startPart; }
-    void setOctets(int octets) { m_octets = octets; }
-    void setEnvelope(Imap::Message::Envelope *envelope) { m_envelope = envelope; }
+    void setCharset(const QString& charset);
+    void setContentFormat(const QString& format);
+    void setDelSp(const QString& delSp);
+    void setFilename(const QString& filename);
+    void setEncoding(const QByteArray& encoding);
+    void setBodyFldId(const QByteArray& bodyFldId);
+    void setBodyDisposition(const QByteArray& bodyDisposition);
+    void setMultipartRelatedStartPart(const QByteArray& startPart);
+    void setOctets(int octets);
+    void setEnvelope(Imap::Message::Envelope *envelope);
 
 private:
     bool isTopLevelMultipart() const;
@@ -144,12 +145,12 @@ public:
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
     QModelIndex parent(const QModelIndex &child) const;
     int rowCount(const QModelIndex &parent) const;
-    int columnCount(const QModelIndex &parent) const { return !m_rootPart ? 0 : 1; }
+    int columnCount(const QModelIndex &parent) const;
     QVariant data(const QModelIndex &index, int role) const;
 
-    QModelIndex message() const { return m_message; }
+    QModelIndex message() const;
 
-    void addIndexMapping(QModelIndex source, MessagePart* destination) { m_map.insert(source, destination); }
+    void addIndexMapping(QModelIndex source, MessagePart* destination);
 
 public slots:
     void insertSubtree(const QModelIndex& parent, const QVector<Cryptography::MessagePart*>& children);
