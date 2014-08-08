@@ -299,6 +299,8 @@ QVariant LocalMessagePart::data(int role) const
         return isTopLevelMultipart();
     case Imap::Mailbox::RolePartForceFetchFromCache:
         return QVariant(); // Nothing to do here
+    case Imap::Mailbox::RolePartBufferPtr:
+        return QVariant::fromValue(const_cast<QByteArray*>(&m_data));
     default:
         break;
     }
