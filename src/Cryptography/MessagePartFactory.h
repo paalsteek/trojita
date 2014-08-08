@@ -20,8 +20,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef COMMON_MESSAGEPARTFACTORY_H
-#define COMMON_MESSAGEPARTFACTORY_H
+#ifndef CRYPTOGRAPHY_MESSAGEPARTFACTORY_H
+#define CRYPTOGRAPHY_MESSAGEPARTFACTORY_H
 
 #include <QObject>
 
@@ -59,4 +59,4 @@ private:
     Cryptography::SMIMEHelper *m_cmsHelper;
 };
 }
-#endif /* COMMON_MESSAGEPARTFACTORY_H */
+#endif /* CRYPTOGRAPHY_MESSAGEPARTFACTORY_H */

@@ -20,8 +20,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef COMMON_MODEL_H
-#define COMMON_MODEL_H
+#ifndef CRYPTOGRAPHY_MESSAGEMODEL_H
+#define CRYPTOGRAPHY_MESSAGEMODEL_H
 
 #include <QHash>
 #include <QObject>
@@ -167,4 +167,4 @@ protected:
     MessagePartFactory *m_factory;
 };
 }
-#endif /* COMMON_MODEL_H */
+#endif /* CRYPTOGRAPHY_MESSAGEMODEL_H */
