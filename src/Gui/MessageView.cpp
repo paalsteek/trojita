@@ -406,7 +406,6 @@ void MessageView::handleMessageAvailable()
         if (m_settings->value(Common::SettingsNames::guiPreferPlaintextRendering, QVariant(true)).toBool())
             loadingMode |= PartWidgetFactory::PART_PREFER_PLAINTEXT_OVER_HTML;
         viewer = factory->create(rootPartIndex.child(0,0), 0, loadingMode);
-        viewer->setParent(this);
         layout->addWidget(viewer);
         viewer->show();
         m_envelope->setMessage(message);

@@ -75,8 +75,6 @@ public:
 
 protected slots:
     void handleRowsInserted(QModelIndex parent, int first, int last);
-
-protected:
     virtual void rebuildWidgets();
 };
 
@@ -92,8 +90,6 @@ public:
 
 protected slots:
     void handleRowsInserted(QModelIndex parent, int first, int last);
-
-protected:
     virtual void rebuildWidgets();
 };
 

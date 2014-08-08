@@ -25,6 +25,7 @@
 #include <QModelIndex>
 #include <QVBoxLayout>
 #include <QTabBar>
+#include <QTimer>
 
 #include "EnvelopeView.h"
 #include "LoadablePartWidget.h"
@@ -183,7 +184,9 @@ MultipartSignedWidget::MultipartSignedWidget(QWidget *parent,
 {
     connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
     setFlat(true);
-    rebuildWidgets();
+
+    // Make sure the parent is set before we add new children so the parent widgets can adjust their layout
+    QTimer::singleShot(0, this, SLOT(rebuildWidgets()));
 }
 
 void MultipartSignedWidget::rebuildWidgets()
@@ -215,7 +218,6 @@ void MultipartSignedWidget::rebuildWidgets()
         layout->addWidget(m_factory->create(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_loadingOptions)));
     }
     setLayout(layout);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 QString MultipartSignedWidget::quoteMe() const
@@ -232,7 +234,8 @@ GenericMultipartWidget::GenericMultipartWidget(QWidget *parent,
     connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
     setContentsMargins(0, 0, 0, 0);
 
-    rebuildWidgets();
+    // Make sure the parent is set before we add new children so the parent widgets can adjust their layout
+    QTimer::singleShot(0, this, SLOT(rebuildWidgets()));
 }
 
 void GenericMultipartWidget::rebuildWidgets()
@@ -252,7 +255,6 @@ void GenericMultipartWidget::rebuildWidgets()
         layout->addWidget(res);
     }
     setLayout(layout);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 QString GenericMultipartWidget::quoteMe() const

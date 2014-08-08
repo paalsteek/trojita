@@ -107,8 +107,6 @@ void SimplePartWidget::slotMarkupPlainText()
     page()->mainFrame()->setHtml(UiUtils::htmlizedTextPart(m_partIndex, Gui::Util::systemMonospaceFont(),
                                                            palette.base().color(), palette.text().color(),
                                                            palette.link().color(), palette.linkVisited().color()));
-
-    setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Expanding);
 }
 
 void SimplePartWidget::slotFileNameRequested(QString *fileName)
