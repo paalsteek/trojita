@@ -271,6 +271,12 @@ void MainWindow::createActions()
     connect(showTaskView, SIGNAL(triggered(bool)), taskDock, SLOT(setVisible(bool)));
     connect(taskDock, SIGNAL(visibilityChanged(bool)), showTaskView, SLOT(setChecked(bool)));
 
+    //: a debugging tool showing the mime tree of the current message
+    showMailView = new QAction(tr("Show &Mail tree"), this);
+    showMailView->setCheckable(true);
+    connect(showMailView, SIGNAL(triggered(bool)), mailDock, SLOT(setVisible(bool)));
+    connect(mailDock, SIGNAL(visibilityChanged(bool)), showMailView, SLOT(setChecked(bool)));
+
     showImapLogger = new QAction(tr("Show IMAP protocol &log"), this);
     showImapLogger->setCheckable(true);
     connect(showImapLogger, SIGNAL(toggled(bool)), imapLoggerDock, SLOT(setVisible(bool)));
@@ -541,6 +547,7 @@ void MainWindow::createMenus()
     QMenu *debugMenu = imapMenu->addMenu(tr("&Debugging"));
     ADD_ACTION(debugMenu, showFullView);
     ADD_ACTION(debugMenu, showTaskView);
+    ADD_ACTION(debugMenu, showMailView);
     ADD_ACTION(debugMenu, showImapLogger);
     ADD_ACTION(debugMenu, logPersistent);
     ADD_ACTION(debugMenu, showImapCapabilities);
@@ -653,6 +660,15 @@ void MainWindow::createWidgets()
     taskTree->setHeaderHidden(true);
     taskDock->setWidget(taskTree);
     addDockWidget(Qt::LeftDockWidgetArea, taskDock);
+    mailDock = new QDockWidget(tr("Mail Tree"), this);
+    mailDock->setObjectName(QLatin1String("mailDock"));
+    mailTree = new QTreeView(mailDock);
+    mailDock->hide();
+    mailTree->setUniformRowHeights(true);
+    mailTree->setHeaderHidden(true);
+    mailDock->setWidget(mailTree);
+    addDockWidget(Qt::RightDockWidgetArea, mailDock);
+    connect(m_messageWidget->messageView, SIGNAL(messageModelChanged(QAbstractItemModel*)), this, SLOT(slotMessageModelChanged(QAbstractItemModel*)));
 
     imapLoggerDock = new QDockWidget(tr("IMAP Protocol"), this);
     imapLoggerDock->setObjectName(QLatin1String("imapLoggerDock"));
@@ -2436,6 +2452,11 @@ Imap::ImapAccess *MainWindow::imapAccess() const
 void MainWindow::enableLoggingToDisk()
 {
     imapLogger->slotSetPersistentLogging(true);
+}
+
+void MainWindow::slotMessageModelChanged(QAbstractItemModel *model)
+{
+    mailTree->setModel(model);
 }
 
 }
