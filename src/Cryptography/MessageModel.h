@@ -61,6 +61,12 @@ public slots:
     void insertSubtree(const QModelIndex& parent, const QVector<Cryptography::MessagePart*>& children);
     void mapDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);
 
+signals:
+    void error(const QString& error);
+    void passwordRequired(int id, const QString& subject);
+    void passwordAvailable(int id, const QString& password);
+    void passwordError(int id);
+
 protected:
     const QPersistentModelIndex m_message;
     QHash<QModelIndex, MessagePart*> m_map;

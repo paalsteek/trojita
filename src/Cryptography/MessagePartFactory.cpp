@@ -26,6 +26,9 @@
 #include "MessagePartFactory.h"
 #include "MessageModel.h"
 #include "MessagePart.h"
+#ifdef TROJITA_HAVE_QCA
+#include "OpenPGPHelper.h"
+#endif /* TROJITA_HAVE_QCA */
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 
@@ -33,9 +36,20 @@ namespace Cryptography {
 
 MessagePartFactory::MessagePartFactory(MessageModel *model)
     : m_model(model)
+#ifdef TROJITA_HAVE_QCA
+    , m_pgpHelper(new Cryptography::OpenPGPHelper(this))
+{
+    connect(m_pgpHelper, SIGNAL(dataDecrypted(QModelIndex,QVector<Cryptography::MessagePart*>)), m_model, SLOT(insertSubtree(QModelIndex,QVector<Cryptography::MessagePart*>)));
+    connect(m_pgpHelper, SIGNAL(decryptionFailed(QString)), m_model, SIGNAL(error(QString)));
+    connect(m_pgpHelper, SIGNAL(passwordRequired(int,QString)), m_model, SIGNAL(passwordRequired(int,QString)));
+    connect(m_model, SIGNAL(passwordAvailable(int,QString)), m_pgpHelper, SLOT(handlePassword(int,QString)));
+    connect(m_model, SIGNAL(passwordError(int)), m_pgpHelper, SLOT(handlePasswordError(int)));
+}
+#else
 {
 
 }
+#endif /* TROJITA_HAVE_QCA */
 
 void MessagePartFactory::buildProxyTree(const QModelIndex& source, MessagePart *destination)
 {
@@ -46,20 +60,38 @@ void MessagePartFactory::buildProxyTree(const QModelIndex& source, MessagePart *
         buildProxyTree(child, part);
         QModelIndex rawChild = child.child(0, Imap::Mailbox::TreeItem::OFFSET_RAW_CONTENTS);
         // Multipart parts do not have a raw child
-        if (rawChild.isValid())
+        if (rawChild.isValid()) {
             part->setRawPart(new ProxyMessagePart(part, rawChild, m_model));
-        destination->setChild(i, 0, part);
+        }
+#ifdef TROJITA_HAVE_QCA
+        QString mimetype = child.data(Imap::Mailbox::RolePartMimeType).toString();
+        if (mimetype == QLatin1String("multipart/encrypted")) {
+            MessagePart* dummy = new LocalMessagePart(destination, mimetype.toLocal8Bit());
+            dummy->setRawPart(part);
+            destination->setChild(i, 0, dummy);
+        } else
+#endif /* TROJITA_HAVE_QCA */
+        {
+            destination->setChild(i, 0, part);
+        }
         child = source.child(++i, 0);
     }
 }
 
 void MessagePartFactory::buildSubtree(const QModelIndex &parent)
 {
-    MessagePart* child = new ProxyMessagePart(0, parent, m_model);
-    buildProxyTree(parent, child);
-    QVector<MessagePart*> children;
-    children.append(child);
-    m_model->insertSubtree(QModelIndex(), children);
+#ifdef TROJITA_HAVE_QCA
+    if (parent.data(Imap::Mailbox::RolePartMimeType).toString() == QLatin1String("multipart/encrypted")) {
+        m_pgpHelper->decrypt(parent);
+    } else
+#endif /* TROJITA_HAVE_QCA */
+    {
+        MessagePart* child = new ProxyMessagePart(0, parent, m_model);
+        buildProxyTree(parent, child);
+        QVector<MessagePart*> children;
+        children.append(child);
+        m_model->insertSubtree(QModelIndex(), children);
+    }
 }
 
 }

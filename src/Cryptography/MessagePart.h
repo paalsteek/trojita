@@ -26,6 +26,7 @@
 #include <memory>
 #include <QModelIndex>
 #include <QVector>
+#include <QUrl>
 
 namespace Imap {
 namespace Message {
@@ -104,6 +105,9 @@ public:
     void setMultipartRelatedStartPart(const QByteArray& startPart);
     void setOctets(uint octets);
     void setEnvelope(Imap::Message::Envelope *envelope);
+    void setHdrReferences(const QList<QByteArray>& references);
+    void setHdrListPost(const QList<QUrl>& listPost);
+    void setHdrListPostNo(const bool listPostNo);
 
 private:
     bool isTopLevelMultipart() const;
@@ -112,6 +116,9 @@ private:
 
 protected:
     Imap::Message::Envelope *m_envelope;
+    QList<QByteArray> m_hdrReferences;
+    QList<QUrl> m_hdrListPost;
+    bool m_hdrListPostNo;
     FetchingState m_state;
     QByteArray m_charset;
     QByteArray m_contentFormat;

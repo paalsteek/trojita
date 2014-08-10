@@ -20,39 +20,39 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CRYPTOGRAPHY_MESSAGEPARTFACTORY_H
-#define CRYPTOGRAPHY_MESSAGEPARTFACTORY_H
+#ifndef CRYPTOGRAPHY_OPENPGPHELPER_H_
+#define CRYPTOGRAPHY_OPENPGPHELPER_H_
 
-#include <QObject>
+#include <QModelIndex>
+#include "QCAHelper.h"
 
-class QModelIndex;
+namespace QCA {
+class OpenPGP;
+}
 
 namespace Cryptography {
-class MessageModel;
-class MessagePart;
-class OpenPGPHelper;
 
-/** @short Factory to populate a MessageModel with all remote message parts,
- * decrypt encrypted messages and add the decrypted content to the MessageModel
- */
-class MessagePartFactory: public QObject {
+/** @short Wrapper for asynchronous PGP related operations using QCA */
+class OpenPGPHelper : public QCAHelper {
     Q_OBJECT
-public:
-    MessagePartFactory(MessageModel* model);
 
-public slots:
-    /** @short Build a subtree of either ProxyMessageParts for an existing message
-     * or of LocalMessageParts after decrypting an encrypted message and add that
-     * tree to our MessageModel
-     */
-    void buildSubtree(const QModelIndex& parent);
+public:
+    OpenPGPHelper(QObject* parent);
+    ~OpenPGPHelper();
+    void decrypt(const QModelIndex& parent);
+
+signals:
+    void dataDecrypted(const QModelIndex& parent, const QVector<Cryptography::MessagePart*>& part);
+    void decryptionFailed(const QString& error);
+
+private slots:
+    void handleDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);
+    void decryptionFinished();
 
 private:
-    /** @short Build the tree of ProxyMessageParts for a given message */
-    void buildProxyTree(const QModelIndex& source, MessagePart* destination);
-
-    MessageModel *m_model;
-    Cryptography::OpenPGPHelper *m_pgpHelper;
+    QModelIndex m_partIndex;
+    QCA::OpenPGP *m_pgp;
 };
 }
-#endif /* CRYPTOGRAPHY_MESSAGEPARTFACTORY_H */
+
+#endif /* CRYPTOGRAPHY_OPENPGPHELPER_H_ */

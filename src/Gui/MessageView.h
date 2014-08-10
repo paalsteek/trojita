@@ -100,6 +100,7 @@ private slots:
     void onWebViewLoadFinished();
     void handleMessageModelError(const QString& error);
     void handleMessageAvailable();
+    void passwordRequested(int id, const QString& subject);
 signals:
     void messageChanged();
     void messageModelChanged(QAbstractItemModel *model);
@@ -107,6 +108,8 @@ signals:
     void searchRequestedBy(EmbeddedWebView *webView);
     void addressDetailsRequested(const QString &mail, QStringList &addresses);
     void transferError(const QString &errorString);
+    void passwordAvailable(int id, const QString& password);
+    void passwordError(int id);
 private:
     bool eventFilter(QObject *object, QEvent *event);
     Imap::Message::Envelope envelope() const;

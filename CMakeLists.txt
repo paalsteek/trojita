@@ -84,6 +84,7 @@ trojita_option(WITH_RAGEL "Build with Ragel library" AUTO)
 trojita_option(WITH_ZLIB "Build with zlib library" AUTO)
 trojita_option(WITH_SHARED_PLUGINS "Enable shared dynamic plugins" ON)
 trojita_option(WITH_TESTS "Build tests" ON "NOT WITH_HARMATTAN")
+trojita_option(WITH_QCA "Build with Qt Cryptographic Architecture" AUTO)
 
 if(WIN32)
     trojita_option(WITH_NSIS "Build Windows NSIS installer" AUTO "WITH_DESKTOP")
@@ -143,6 +144,9 @@ trojita_plugin_option(WITH_CLEARTEXT_PLUGIN "Build Cleartext password plugin" ST
 trojita_plugin_option(WITH_QTKEYCHAIN_PLUGIN "Build Qtkeychain password plugin" "NOT WITH_HARMATTAN${QTKEYCHAIN_DEPENDS}")
 
 trojita_find_package(Git "" "" "" "")
+
+trojita_find_package(QCA2 "" "" "Qt Cryptographic Architecture" "" WITH_QCA)
+trojita_find_package(Mimetic "" "" "" "" WITH_QCA)
 
 if(WIN32)
     trojita_find_package(MakeNSIS "" "http://nsis.sourceforge.net" "Nullsoft Scriptable Install System" "Needed for building Windows installer" WITH_NSIS)
@@ -283,6 +287,12 @@ if(NOT ZLIB_FOUND)
     trojita_find_package(ZLIB "" "" "" "" WITH_ZLIB)
 endif()
 
+if(WITH_QCA)
+  set(TROJITA_HAVE_QCA True)
+else()
+  set(TROJITA_HAVE_QCA False)
+endif()
+
 if(WITH_ZLIB)
     set(TROJITA_HAVE_ZLIB True)
     message(STATUS "Support for COMPRESS=DEFLATE enabled")
@@ -374,6 +384,13 @@ set(libCryptography_SOURCES
     ${path_Cryptography}/MessagePart.cpp
     ${path_Cryptography}/MessagePartFactory.cpp
 )
+if(WITH_QCA)
+    set(libCryptography_SOURCES
+        ${libCryptography_SOURCES}
+        ${path_Cryptography}/QCAHelper.cpp
+        ${path_Cryptography}/OpenPGPHelper.cpp
+    )
+endif()
 
 if(WITH_ZLIB)
     set(libStreams_SOURCES ${libStreams_SOURCES}
@@ -663,6 +680,9 @@ target_link_libraries(Common ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
 
 add_library(Cryptography STATIC ${libCryptography_SOURCES})
 set_property(TARGET Cryptography APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
+if(WITH_QCA)
+    target_link_libraries(Cryptography ${QCA2_LIBRARIES} ${MIMETIC_LIBRARIES})
+endif()
 
 add_library(AppVersion STATIC ${libAppVersion_SOURCES})
 set_property(TARGET AppVersion APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)

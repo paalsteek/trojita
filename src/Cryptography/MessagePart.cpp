@@ -196,6 +196,21 @@ void LocalMessagePart::setEnvelope(Imap::Message::Envelope *envelope)
     m_envelope = envelope;
 }
 
+void LocalMessagePart::setHdrReferences(const QList<QByteArray> &references)
+{
+    m_hdrReferences = references;
+}
+
+void LocalMessagePart::setHdrListPost(const QList<QUrl> &listPost)
+{
+    m_hdrListPost = listPost;
+}
+
+void LocalMessagePart::setHdrListPostNo(const bool listPostNo)
+{
+    m_hdrListPostNo = listPostNo;
+}
+
 bool LocalMessagePart::isTopLevelMultipart() const
 {
     return m_mimetype.startsWith("multipart/") && (!parent()->parent() || parent()->data(Imap::Mailbox::RolePartMimeType).toByteArray().startsWith("message/"));
@@ -254,6 +269,17 @@ QVariant LocalMessagePart::data(int role) const
                 return QVariant::fromValue<Imap::Message::Envelope>(*m_envelope);
             else
                 return QVariant();
+        case Imap::Mailbox::RoleMessageHeaderReferences:
+            return QVariant::fromValue(m_hdrReferences);
+        case Imap::Mailbox::RoleMessageHeaderListPost:
+        {
+            QVariantList res;
+            Q_FOREACH(const QUrl &url, m_hdrListPost)
+                res << url;
+            return res;
+        }
+        case Imap::Mailbox::RoleMessageHeaderListPostNo:
+            return m_hdrListPostNo;
         }
     }
 
