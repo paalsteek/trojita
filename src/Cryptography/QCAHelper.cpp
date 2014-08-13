@@ -68,11 +68,20 @@ void QCAHelper::handleEventReady(int id, const QCA::Event &e)
     }
 
     if ( e.type() == QCA::Event::Password ) {
-        // TODO: hard coded password? really?
-        _handler.submitPassword(id, QCA::SecureArray(""));
+        emit passwordRequired(id, e.fileName());
     } else {
         _handler.reject(id);
     }
+}
+
+void QCAHelper::handlePassword(int id, const QString &password)
+{
+    _handler.submitPassword(id, QCA::SecureArray(password.toLocal8Bit()));
+}
+
+void QCAHelper::handlePasswordError(int id)
+{
+    _handler.reject(id);
 }
 
 #ifdef TROJITA_HAVE_MIMETIC

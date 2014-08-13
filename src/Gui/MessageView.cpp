@@ -27,6 +27,7 @@
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QSettings>
+#include <QTextDocument>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -43,6 +44,7 @@
 #include "ExternalElementsWidget.h"
 #include "OverlayWidget.h"
 #include "PartWidgetFactory.h"
+#include "PasswordDialog.h"
 #include "SimplePartWidget.h"
 #include "Spinner.h"
 #include "TagListWidget.h"
@@ -203,6 +205,9 @@ void MessageView::setMessage(const QModelIndex &index)
     if (!messageModel) {
         messageModel = new Cryptography::MessageModel(this, messageIndex);
         connect(messageModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleMessageAvailable()));
+        connect(messageModel, SIGNAL(passwordRequired(int,QString)), this, SLOT(passwordRequested(int,QString)));
+        connect(this, SIGNAL(passwordAvailable(int,QString)), messageModel, SIGNAL(passwordAvailable(int,QString)));
+        connect(this, SIGNAL(passwordError(int)), messageModel, SIGNAL(passwordError(int)));
         emit messageModelChanged(messageModel);
     }
 
@@ -310,6 +315,25 @@ void MessageView::setNetworkWatcher(Imap::Mailbox::NetworkWatcher *netWatcher)
 {
     m_netWatcher = netWatcher;
     factory->setNetworkWatcher(netWatcher);
+}
+
+void MessageView::passwordRequested(int id, const QString &subject)
+{
+    bool ok;
+    QString pass = PasswordDialog::getPassword(this, tr("Password Required"),
+                                       tr("<p>Please provide the password for <b>%1</b>:</p>").arg(
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+                                           Qt::escape(subject)
+#else
+                                           subject.toHtmlEscaped()
+#endif
+                                           ),
+                                       QString(), &ok);
+    if (ok) {
+        emit passwordAvailable(id, pass);
+    } else {
+        emit passwordError(id);
+    }
 }
 
 void MessageView::reply(MainWindow *mainWindow, Composer::ReplyMode mode)

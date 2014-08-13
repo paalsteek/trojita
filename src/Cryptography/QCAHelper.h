@@ -51,6 +51,11 @@ public:
 
 protected slots:
     void handleEventReady(int id, const QCA::Event &e);
+    void handlePassword(int id, const QString& password);
+    void handlePasswordError(int id);
+
+signals:
+    void passwordRequired(int id, const QString& subject);
 
 protected:
     static QString qcaErrorStrings(int e);

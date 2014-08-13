@@ -41,7 +41,13 @@ MessagePartFactory::MessagePartFactory(MessageModel *model)
     , m_cmsHelper(new Cryptography::SMIMEHelper(this))
 {
     connect(m_pgpHelper, SIGNAL(dataDecrypted(QModelIndex,QVector<Cryptography::MessagePart*>)), m_model, SLOT(insertSubtree(QModelIndex,QVector<Cryptography::MessagePart*>)));
+    connect(m_pgpHelper, SIGNAL(passwordRequired(int,QString)), m_model, SIGNAL(passwordRequired(int,QString)));
+    connect(m_model, SIGNAL(passwordAvailable(int,QString)), m_pgpHelper, SLOT(handlePassword(int,QString)));
+    connect(m_model, SIGNAL(passwordError(int)), m_pgpHelper, SLOT(handlePasswordError(int)));
     connect(m_cmsHelper, SIGNAL(dataDecrypted(QModelIndex,QVector<Cryptography::MessagePart*>)), m_model, SLOT(insertSubtree(QModelIndex,QVector<Cryptography::MessagePart*>)));
+    connect(m_cmsHelper, SIGNAL(passwordRequired(int,QString)), m_model, SIGNAL(passwordRequired(int,QString)));
+    connect(m_model, SIGNAL(passwordAvailable(int,QString)), m_cmsHelper, SLOT(handlePassword(int,QString)));
+    connect(m_model, SIGNAL(passwordError(int)), m_cmsHelper, SLOT(handlePasswordError(int)));
 }
 #else
 {
