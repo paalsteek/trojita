@@ -308,11 +308,11 @@ QVariant LocalMessagePart::data(int role) const
     return QVariant();
 }
 
-MessageModel::MessageModel(QObject *parent, const QModelIndex &message)
+MessageModel::MessageModel(QObject *parent, const QModelIndex &message, QSettings *settings)
     : QAbstractItemModel(parent)
     , m_message(message)
     , m_rootPart(0)
-    , m_factory(new MessagePartFactory(this))
+    , m_factory(new MessagePartFactory(this, settings))
 {
     // Make sure the message structure is loaded
     Q_ASSERT(m_message.model()->rowCount(m_message) > 0);

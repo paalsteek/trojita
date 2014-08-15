@@ -31,8 +31,8 @@
 #include "Imap/Model/MailboxTree.h"
 
 namespace Cryptography {
-OpenPGPHelper::OpenPGPHelper(QObject *parent)
-    : QCAHelper(parent)
+OpenPGPHelper::OpenPGPHelper(QObject *parent, QSettings *settings)
+    : QCAHelper(parent, settings)
     , m_partIndex()
     , m_pgp(new QCA::OpenPGP(this))
 {

@@ -32,12 +32,13 @@
 #include "Imap/Parser/Message.h"
 
 namespace Cryptography {
-QCAHelper::QCAHelper(QObject *parent)
+QCAHelper::QCAHelper(QObject *parent, QSettings *settings)
     : QObject(parent)
-    , _handler(this)
+    , m_handler(this)
+    , m_settings(settings)
 {
-    connect(&_handler, SIGNAL(eventReady(int,QCA::Event)), this, SLOT(handleEventReady(int,QCA::Event)));
-    _handler.start();
+    connect(&m_handler, SIGNAL(eventReady(int,QCA::Event)), this, SLOT(handleEventReady(int,QCA::Event)));
+    m_handler.start();
 }
 
 QString QCAHelper::qcaErrorStrings(int e)
@@ -70,18 +71,18 @@ void QCAHelper::handleEventReady(int id, const QCA::Event &e)
     if ( e.type() == QCA::Event::Password ) {
         emit passwordRequired(id, e.fileName());
     } else {
-        _handler.reject(id);
+        m_handler.reject(id);
     }
 }
 
 void QCAHelper::handlePassword(int id, const QString &password)
 {
-    _handler.submitPassword(id, QCA::SecureArray(password.toLocal8Bit()));
+    m_handler.submitPassword(id, QCA::SecureArray(password.toLocal8Bit()));
 }
 
 void QCAHelper::handlePasswordError(int id)
 {
-    _handler.reject(id);
+    m_handler.reject(id);
 }
 
 #ifdef TROJITA_HAVE_MIMETIC

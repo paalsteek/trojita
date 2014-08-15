@@ -29,13 +29,14 @@
 
 #include "SMIMEHelper.h"
 #include "MessageModel.h"
+#include "Common/SettingsNames.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 
 
 namespace Cryptography {
-SMIMEHelper::SMIMEHelper(QObject *parent)
-    : QCAHelper(parent)
+SMIMEHelper::SMIMEHelper(QObject *parent, QSettings *settings)
+    : QCAHelper(parent, settings)
     , m_cms(new QCA::CMS(this))
     , m_loader(new QCA::KeyLoader(this))
 {
@@ -68,9 +69,9 @@ void SMIMEHelper::privateKeyLoaded()
 void SMIMEHelper::decrypt(const QModelIndex &parent)
 {
     if (QCA::isSupported("cms")) {
-        if ( m_cms->privateKeys().size() == 0 ) {
-            // TODO: make this configurable
-            m_loader->loadKeyBundleFromFile("");
+        if ( m_cms->privateKeys().size() == 0 && m_settings->contains(Common::SettingsNames::cryptoSMIMEKeyPath)) {
+            // TODO: support multiple certificates
+            m_loader->loadKeyBundleFromFile(m_settings->value(Common::SettingsNames::cryptoSMIMEKeyPath).toString());
         }
 
         m_partIndex = parent;

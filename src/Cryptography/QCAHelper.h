@@ -23,6 +23,7 @@
 #ifndef CRYPTOGRAPHY_QCAHELPER_H_
 #define CRYPTOGRAPHY_QCAHELPER_H_
 
+#include <QSettings>
 #include <QtCrypto/QtCrypto>
 
 namespace mimetic {
@@ -47,7 +48,7 @@ class QCAHelper : public QObject {
     Q_OBJECT
 
 public:
-    QCAHelper(QObject *parent);
+    QCAHelper(QObject *parent, QSettings *settings);
 
 protected slots:
     void handleEventReady(int id, const QCA::Event &e);
@@ -64,8 +65,9 @@ protected:
     static QList<Imap::Message::MailAddress> mailboxListToQList(const mimetic::MailboxList& list);
     static QList<Imap::Message::MailAddress> addressListToQList(const mimetic::AddressList& list);
 
-    QCA::Initializer _init;
-    QCA::EventHandler _handler;
+    QCA::Initializer m_init;
+    QCA::EventHandler m_handler;
+    QSettings *m_settings;
 };
 }
 

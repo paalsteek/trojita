@@ -203,7 +203,7 @@ void MessageView::setMessage(const QModelIndex &index)
         messageModel = 0;
     }
     if (!messageModel) {
-        messageModel = new Cryptography::MessageModel(this, messageIndex);
+        messageModel = new Cryptography::MessageModel(this, messageIndex, m_settings);
         connect(messageModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleMessageAvailable()));
         connect(messageModel, SIGNAL(passwordRequired(int,QString)), this, SLOT(passwordRequested(int,QString)));
         connect(this, SIGNAL(passwordAvailable(int,QString)), messageModel, SIGNAL(passwordAvailable(int,QString)));

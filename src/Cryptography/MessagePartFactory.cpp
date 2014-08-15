@@ -34,11 +34,11 @@
 
 namespace Cryptography {
 
-MessagePartFactory::MessagePartFactory(MessageModel *model)
+MessagePartFactory::MessagePartFactory(MessageModel *model, QSettings *settings)
     : m_model(model)
 #ifdef TROJITA_HAVE_QCA
-    , m_pgpHelper(new Cryptography::OpenPGPHelper(this))
-    , m_cmsHelper(new Cryptography::SMIMEHelper(this))
+    , m_pgpHelper(new Cryptography::OpenPGPHelper(this, settings))
+    , m_cmsHelper(new Cryptography::SMIMEHelper(this, settings))
 {
     connect(m_pgpHelper, SIGNAL(dataDecrypted(QModelIndex,QVector<Cryptography::MessagePart*>)), m_model, SLOT(insertSubtree(QModelIndex,QVector<Cryptography::MessagePart*>)));
     connect(m_pgpHelper, SIGNAL(passwordRequired(int,QString)), m_model, SIGNAL(passwordRequired(int,QString)));

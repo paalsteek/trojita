@@ -36,7 +36,7 @@ namespace Cryptography {
         Q_OBJECT
 
     public:
-        OpenPGPHelper(QObject* parent);
+        OpenPGPHelper(QObject* parent, QSettings *settings);
         ~OpenPGPHelper();
         void decrypt(const QModelIndex& parent);
 

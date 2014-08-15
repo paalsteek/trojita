@@ -26,6 +26,7 @@
 #include <QHash>
 #include <QObject>
 #include <QPersistentModelIndex>
+#include <QSettings>
 
 #include <QDebug>
 
@@ -140,7 +141,7 @@ class MessageModel: public QAbstractItemModel
     Q_OBJECT
 
 public:
-    MessageModel(QObject *parent, const QModelIndex& message);
+    MessageModel(QObject *parent, const QModelIndex& message, QSettings *settings);
     ~MessageModel();
 
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;

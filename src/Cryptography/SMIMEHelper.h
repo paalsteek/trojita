@@ -35,7 +35,7 @@ namespace Cryptography {
         Q_OBJECT
 
     public:
-        SMIMEHelper(QObject* parent);
+        SMIMEHelper(QObject* parent, QSettings *settings);
         ~SMIMEHelper();
         void decrypt(const QModelIndex& parent);
 

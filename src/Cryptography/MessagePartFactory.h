@@ -24,6 +24,7 @@
 #define CRYPTOGRAPHY_MESSAGEPARTFACTORY_H
 
 #include <QObject>
+#include <QSettings>
 
 class QModelIndex;
 
@@ -41,7 +42,7 @@ class MessagePart;
 class MessagePartFactory: public QObject {
     Q_OBJECT
 public:
-    MessagePartFactory(MessageModel* model);
+    MessagePartFactory(MessageModel* model, QSettings *settings);
 
 public slots:
     /** @short Build a subtree of either ProxyMessageParts for an existing message
