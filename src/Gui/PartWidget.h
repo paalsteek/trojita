@@ -49,8 +49,28 @@ protected:
     bool eventFilter(QObject *o, QEvent *e);
 };
 
+/** @short Base class for handling parts where the structure of the chilren is not known yet */
+class AsynchronousPartWidget: public QGroupBox, public AbstractPartWidget
+{
+    Q_OBJECT
+public:
+    AsynchronousPartWidget(QWidget *parent, PartWidgetFactory *factory, const QModelIndex &partIndex, const int recursionDepth,
+                           const UiUtils::PartLoadingOptions loadingOptions);
+
+protected slots:
+    void handleRowsInserted(QModelIndex parent, int row, int column);
+
+protected:
+    virtual void buildWidgets() = 0;
+
+    PartWidgetFactory *m_factory;
+    QPersistentModelIndex m_partIndex;
+    const int m_recursionDepth;
+    const UiUtils::PartLoadingOptions m_options;
+};
+
 /** @short Message quoting support for multipart/signed MIME type */
-class MultipartSignedWidget: public QGroupBox, public AbstractPartWidget
+class MultipartSignedWidget: public AsynchronousPartWidget
 {
     Q_OBJECT
 public:
@@ -59,6 +79,23 @@ public:
                           const UiUtils::PartLoadingOptions loadingOptions);
     virtual QString quoteMe() const;
     virtual void reloadContents();
+
+protected:
+    virtual void buildWidgets();
+};
+
+/** @short Handling of the fact that the message structure of encrypted message parts is not available yet */
+class MultipartEncryptedWidget: public AsynchronousPartWidget
+{
+    Q_OBJECT
+public:
+    MultipartEncryptedWidget(QWidget *parent, PartWidgetFactory *factory, const QModelIndex &partIndex, const int recursionDepth,
+                             const UiUtils::PartLoadingOptions loadingOptions);
+    virtual QString quoteMe() const;
+    virtual void reloadContents();
+
+protected:
+    virtual void buildWidgets();
 };
 
 /** @short Message quoting support for generic multipart/ * */

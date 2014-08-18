@@ -29,6 +29,7 @@
 #include "EnvelopeView.h"
 #include "LoadablePartWidget.h"
 #include "MessageView.h"
+#include "Common/InvokeMethod.h"
 #include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 
@@ -170,36 +171,93 @@ bool MultipartAlternativeWidget::eventFilter(QObject *o, QEvent *e)
     return false;
 }
 
+AsynchronousPartWidget::AsynchronousPartWidget(QWidget *parent,
+        PartWidgetFactory *factory, const QModelIndex &partIndex,
+        const int recursionDepth, const UiUtils::PartLoadingOptions options)
+    : QGroupBox(parent)
+    , m_factory(factory)
+    , m_partIndex(partIndex)
+    , m_recursionDepth(recursionDepth)
+    , m_options(options)
+{
+    connect(partIndex.model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleRowsInserted(QModelIndex,int,int)));
+
+    CALL_LATER(this, handleRowsInserted, Q_ARG(QModelIndex, partIndex), Q_ARG(int, 0), Q_ARG(int, 0));
+}
+
+void AsynchronousPartWidget::handleRowsInserted(QModelIndex parent, int, int)
+{
+    if (parent == m_partIndex) {
+        buildWidgets();
+    }
+}
+
 MultipartSignedWidget::MultipartSignedWidget(QWidget *parent,
         PartWidgetFactory *factory, const QModelIndex &partIndex,
-        const int recursionDepth, const UiUtils::PartLoadingOptions options):
-    QGroupBox(tr("Signed Message"), parent)
+        const int recursionDepth, const UiUtils::PartLoadingOptions loadingOptions)
+    : AsynchronousPartWidget(parent, factory, partIndex, recursionDepth, loadingOptions)
+{
+    setTitle(tr("Signed Message"));
+}
+
+void MultipartSignedWidget::buildWidgets()
 {
     setFlat(true);
     using namespace Imap::Mailbox;
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setSpacing(0);
-    uint childrenCount = partIndex.model()->rowCount(partIndex);
+    uint childrenCount = m_partIndex.model()->rowCount(m_partIndex);
     if (childrenCount == 1) {
         setTitle(tr("Malformed multipart/signed message: only one nested part"));
-        QModelIndex anotherPart = partIndex.child(0, 0);
+        QModelIndex anotherPart = m_partIndex.child(0, 0);
         Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        layout->addWidget(factory->walk(anotherPart, recursionDepth + 1, filteredForEmbedding(options)));
+        layout->addWidget(m_factory->walk(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_options)));
     } else if (childrenCount != 2) {
         QLabel *lbl = new QLabel(tr("Malformed multipart/signed message: %1 nested parts").arg(QString::number(childrenCount)), this);
         layout->addWidget(lbl);
         return;
     } else {
         Q_ASSERT(childrenCount == 2); // from the if logic; FIXME: refactor
-        QModelIndex anotherPart = partIndex.child(0, 0);
+        QModelIndex anotherPart = m_partIndex.child(0, 0);
         Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
-        layout->addWidget(factory->walk(anotherPart, recursionDepth + 1, filteredForEmbedding(options)));
+        layout->addWidget(m_factory->walk(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_options)));
     }
 }
 
 QString MultipartSignedWidget::quoteMe() const
 {
     return quoteMeHelper(children());
+}
+
+MultipartEncryptedWidget::MultipartEncryptedWidget(QWidget *parent, PartWidgetFactory *factory,
+                                                   const QModelIndex &partIndex, const int recursionDepth,
+                                                   const UiUtils::PartLoadingOptions loadingOptions)
+    : AsynchronousPartWidget(parent, factory, partIndex, recursionDepth, loadingOptions)
+{
+    setTitle(tr("Encrypted Message"));
+}
+
+QString MultipartEncryptedWidget::quoteMe() const
+{
+    return quoteMeHelper(children());
+}
+
+void MultipartEncryptedWidget::buildWidgets()
+{
+    if (m_partIndex.model()->rowCount(m_partIndex) == 0) {
+        // We have to wait for the message structure to become available
+        return;
+    }
+
+    QVBoxLayout *layout = new QVBoxLayout(this);
+    layout->setSpacing(0);
+    for (int i = 0; i < m_partIndex.model()->rowCount(m_partIndex); ++i) {
+        using namespace Imap::Mailbox;
+        QModelIndex anotherPart = m_partIndex.child(i, 0);
+        Q_ASSERT(anotherPart.isValid()); // guaranteed by the MVC
+        QWidget *res = m_factory->walk(anotherPart, m_recursionDepth + 1, filteredForEmbedding(m_options));
+        layout->addWidget(res);
+    }
 }
 
 GenericMultipartWidget::GenericMultipartWidget(QWidget *parent,
@@ -263,6 +321,7 @@ QString Message822Widget::quoteMe() const
 }
 
 IMPL_RELOAD(MultipartSignedWidget);
+IMPL_RELOAD(MultipartEncryptedWidget);
 IMPL_RELOAD(GenericMultipartWidget);
 IMPL_RELOAD(Message822Widget);
 
