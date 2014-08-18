@@ -368,6 +368,13 @@ set(libStreams_SOURCES
     ${path_Streams}/SocketFactory.cpp
 )
 
+set(path_Cryptography ${CMAKE_CURRENT_SOURCE_DIR}/src/Cryptography)
+set(libCryptography_SOURCES
+    ${path_Cryptography}/MessageModel.cpp
+    ${path_Cryptography}/MessagePart.cpp
+    ${path_Cryptography}/MessagePartFactory.cpp
+)
+
 if(WITH_ZLIB)
     set(libStreams_SOURCES ${libStreams_SOURCES}
         ${path_Streams}/3rdparty/rfc1951.cpp)
@@ -654,6 +661,9 @@ set_property(TARGET Common APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_A
 add_dependencies(Common version)
 target_link_libraries(Common ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
 
+add_library(Cryptography STATIC ${libCryptography_SOURCES})
+set_property(TARGET Cryptography APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
+
 add_library(AppVersion STATIC ${libAppVersion_SOURCES})
 set_property(TARGET AppVersion APPEND PROPERTY COMPILE_DEFINITIONS QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
 add_dependencies(AppVersion version)
@@ -782,7 +792,7 @@ if(WITH_DESKTOP)
     if(SUPPORTS_TARGET_INCLUDES)
         set_property(TARGET DesktopGui APPEND PROPERTY INCLUDE_DIRECTORIES ${path_DesktopGui})
     endif()
-    target_link_libraries(DesktopGui Common UiUtils Composer Imap IPC MSA Plugins Streams qwwsmtpclient AbookAddressbook ${QT_QTWEBKIT_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
+    target_link_libraries(DesktopGui Common UiUtils Composer Cryptography Imap IPC MSA Plugins Streams qwwsmtpclient AbookAddressbook ${QT_QTWEBKIT_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTCORE_LIBRARY})
 
     # On Windows build a real Win32 GUI application without console window
     # On other platforms WIN32 flag is ignored
@@ -814,6 +824,7 @@ endif()
 if(WITH_QT5)
     qt5_use_modules(AppVersion Core)
     qt5_use_modules(Common Core Network)
+    qt5_use_modules(Cryptography Core Network)
     qt5_use_modules(UiUtils Core Gui Network)
     qt5_use_modules(Streams Network)
     qt5_use_modules(qwwsmtpclient Network)
@@ -878,7 +889,7 @@ if(WITH_TESTS)
     macro(trojita_test dir fname)
         set(test_${fname}_SOURCES tests/${dir}/test_${fname}.cpp)
         add_executable(test_${fname} ${test_${fname}_SOURCES})
-        target_link_libraries(test_${fname} Imap MSA Streams Common Composer test_LibMailboxSync)
+        target_link_libraries(test_${fname} Imap MSA Streams Common Composer Cryptography test_LibMailboxSync)
         if(WITH_QT5)
             qt5_use_modules(test_${fname} Network Sql Test Widgets)
         else()
@@ -923,6 +934,7 @@ if(WITH_TESTS)
     trojita_test(Imap Imap_BodyParts)
     trojita_test(Imap Imap_Offline)
     trojita_test(Imap Imap_CopyAndFlagOperations)
+    trojita_test(Cryptography Cryptography_MessageModel)
     trojita_test(Misc Rfc5322)
     trojita_test(Misc RingBuffer)
     trojita_test(Misc SenderIdentitiesModel)

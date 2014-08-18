@@ -54,6 +54,7 @@
 #include "Common/SettingsNames.h"
 #include "Composer/QuoteText.h"
 #include "Composer/SubjectMangling.h"
+#include "Cryptography/MessageModel.h"
 #include "Imap/Model/MailboxTree.h"
 #include "Imap/Model/MsgListModel.h"
 #include "Imap/Model/NetworkWatcher.h"
@@ -63,7 +64,7 @@
 namespace Gui
 {
 
-MessageView::MessageView(QWidget *parent, QSettings *settings): QWidget(parent), m_settings(settings)
+MessageView::MessageView(QWidget *parent, QSettings *settings): QWidget(parent), messageModel(0), m_settings(settings)
 {
     QPalette pal = palette();
     pal.setColor(backgroundRole(), palette().color(QPalette::Active, QPalette::Base));
@@ -177,7 +178,7 @@ void MessageView::setEmpty()
     m_envelope->setMessage(QModelIndex());
     headerSection->hide();
     message = QModelIndex();
-    disconnect(this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
+    disconnect(this, SLOT(handleMessageAvailable()));
     tags->hide();
     if (viewer != emptyView) {
         layout->removeWidget(viewer);
@@ -197,6 +198,16 @@ void MessageView::setMessage(const QModelIndex &index)
     QModelIndex messageIndex = Imap::deproxifiedIndex(index);
     Q_ASSERT(messageIndex.isValid());
 
+    if (messageModel && messageModel->message() != messageIndex) {
+        delete messageModel;
+        messageModel = 0;
+    }
+    if (!messageModel) {
+        messageModel = new Cryptography::MessageModel(this, messageIndex);
+        connect(messageModel, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(handleMessageAvailable()));
+        emit messageModelChanged(messageModel);
+    }
+
     // The data might be available from the local cache, so let's try to save a possible roundtrip here
     // by explicitly requesting the data
     messageIndex.data(Imap::Mailbox::RolePartData);
@@ -211,44 +222,13 @@ void MessageView::setMessage(const QModelIndex &index)
         return;
     }
 
-    QModelIndex rootPartIndex = messageIndex.child(0, 0);
-
-    headerSection->show();
     if (message != messageIndex) {
-        emptyView->hide();
-        layout->removeWidget(viewer);
-        if (viewer != emptyView) {
-            viewer->setParent(0);
-            viewer->deleteLater();
-        }
+        setEmpty();
         message = messageIndex;
-        netAccess->setExternalsEnabled(false);
-        externalElements->hide();
-
-        netAccess->setModelMessage(message);
-
-        m_loadingItems.clear();
-        m_loadingSpinner->stop();
-
-        UiUtils::PartLoadingOptions loadingMode;
-        if (m_settings->value(Common::SettingsNames::guiPreferPlaintextRendering, QVariant(true)).toBool())
-            loadingMode |= UiUtils::PART_PREFER_PLAINTEXT_OVER_HTML;
-        viewer = factory->walk(rootPartIndex, 0, loadingMode);
-        viewer->setParent(this);
-        layout->addWidget(viewer);
-        viewer->show();
-        m_envelope->setMessage(message);
-
-        tags->show();
-        tags->setTagList(messageIndex.data(Imap::Mailbox::RoleMessageFlags).toStringList());
-        disconnect(this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
-        connect(messageIndex.model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(handleDataChanged(QModelIndex,QModelIndex)));
-
-        emit messageChanged();
-
-        // We want to propagate the QWheelEvent to upper layers
-        viewer->installEventFilter(this);
+        // make sure handleMessageAvailable is called at least once
+        handleMessageAvailable();
     }
+    headerSection->show();
 
     if (m_netWatcher && m_netWatcher->effectiveNetworkPolicy() != Imap::Mailbox::NETWORK_OFFLINE
             && m_settings->value(Common::SettingsNames::autoMarkReadEnabled, QVariant(true)).toBool()) {
@@ -409,16 +389,41 @@ void MessageView::deleteLabelAction(const QString &tag)
     model->setMessageFlags(QModelIndexList() << message, tag, Imap::Mailbox::FLAG_REMOVE);
 }
 
-void MessageView::handleDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+void MessageView::handleMessageAvailable()
 {
-    Q_ASSERT(topLeft.row() == bottomRight.row() && topLeft.parent() == bottomRight.parent());
-    if (topLeft == message) {
-        if (viewer == emptyView && message.data(Imap::Mailbox::RoleIsFetched).toBool()) {
-            qDebug() << "MessageView: message which was previously not loaded has just became available";
-            setEmpty();
-            setMessage(topLeft);
+    Q_ASSERT(messageModel);
+    QModelIndex rootPartIndex = messageModel->index(0,0);
+    if (viewer == emptyView && rootPartIndex.child(0,0).isValid()) {
+        emptyView->hide();
+        layout->removeWidget(viewer);
+        if (viewer != emptyView) {
+            viewer->setParent(0);
+            viewer->deleteLater();
         }
+        netAccess->setExternalsEnabled(false);
+        externalElements->hide();
+
+        netAccess->setModelMessage(rootPartIndex);
+
+        m_loadingItems.clear();
+        m_loadingSpinner->stop();
+
+        UiUtils::PartLoadingOptions loadingMode;
+        if (m_settings->value(Common::SettingsNames::guiPreferPlaintextRendering, QVariant(true)).toBool())
+            loadingMode |= UiUtils::PART_PREFER_PLAINTEXT_OVER_HTML;
+        viewer = factory->walk(rootPartIndex.child(0,0), 0, loadingMode);
+        viewer->setParent(this);
+        layout->addWidget(viewer);
+        viewer->show();
+        m_envelope->setMessage(message);
+
+        tags->show();
         tags->setTagList(message.data(Imap::Mailbox::RoleMessageFlags).toStringList());
+
+        emit messageChanged();
+
+        // We want to propagate the QWheelEvent to upper layers
+        viewer->installEventFilter(this);
     }
 }
 
@@ -471,6 +476,12 @@ void MessageView::triggerSearchDialog()
 QModelIndex MessageView::currentMessage() const
 {
     return message;
+}
+
+void MessageView::handleMessageModelError(const QString &error)
+{
+    m_loadingSpinner->stop();
+    QMessageBox::warning(this, tr("Unable to open message"), error);
 }
 
 void MessageView::onWebViewLoadStarted()
