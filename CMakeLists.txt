@@ -955,6 +955,7 @@ if(WITH_TESTS)
     trojita_test(Imap Imap_Offline)
     trojita_test(Imap Imap_CopyAndFlagOperations)
     trojita_test(Cryptography Cryptography_MessageModel)
+    trojita_test(Cryptography Cryptography_PGP)
     trojita_test(Misc Rfc5322)
     trojita_test(Misc RingBuffer)
     trojita_test(Misc SenderIdentitiesModel)
@@ -962,6 +963,9 @@ if(WITH_TESTS)
     trojita_test(Misc algorithms)
     trojita_test(Misc rfccodecs)
 
+    add_custom_command(TARGET test_Cryptography_PGP PRE_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                       ${CMAKE_SOURCE_DIR}/tests/Cryptography/keys ${CMAKE_BINARY_DIR}/keys)
 endif()
 
 if(WIN32) # Check if we are on Windows

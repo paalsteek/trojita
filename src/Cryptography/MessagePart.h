@@ -27,6 +27,7 @@
 #include <QModelIndex>
 #include <QVector>
 #include <QUrl>
+#include <QVector>
 
 namespace Imap {
 namespace Message {
